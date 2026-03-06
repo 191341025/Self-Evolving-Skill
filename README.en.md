@@ -1,11 +1,20 @@
-**English** | **[中文](README.md)**
+<div align="center">
 
 # Self-Evolving Skill Pattern
 
-> A design pattern for Claude Code Skills that improve through use —
-> growing more accurate and efficient over time, without bloating.
+**English** | **[中文](README.md)**
 
-**Academic positioning:** This pattern corresponds to *Inter-test-time Context Evolution with Text-Feedback Governance* in the self-evolving agent literature. See Gao et al. (2026) "A Survey of Self-Evolving Agents" (arXiv:2507.21046v4).
+*A design pattern for Claude Code Skills that improve through use —*
+*growing more accurate and efficient over time, without bloating.*
+
+[![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC_BY--SA_4.0-lightgrey.svg)](LICENSE)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-Skill_Pattern-blue.svg)](https://docs.anthropic.com/en/docs/claude-code)
+[![Paper](https://img.shields.io/badge/arXiv-2507.21046v4-b31b1b.svg)](2507.21046v4.pdf)
+
+</div>
+
+> [!NOTE]
+> **Academic positioning:** This pattern corresponds to *Inter-test-time Context Evolution with Text-Feedback Governance* in the self-evolving agent literature. See Gao et al. (2026) "A Survey of Self-Evolving Agents."
 
 ---
 

@@ -1,11 +1,20 @@
-**[English](README.en.md)** | **中文**
+<div align="center">
 
 # Self-Evolving Skill 设计模式
 
-> 一种让 Claude Code Skill 在使用中自我进化的设计模式。
-> 越用越准确、越用越高效，但不会越用越臃肿。
+**[English](README.en.md)** | **中文**
 
-**学术定位**：本模式对应自演化智能体研究中的 *Inter-test-time Context Evolution with Text-Feedback Governance*（跨会话上下文演化 + 文本反馈治理）。参见 Gao et al. (2026) "A Survey of Self-Evolving Agents" (arXiv:2507.21046v4)。
+*一种让 Claude Code Skill 在使用中自我进化的设计模式*
+*越用越准确、越用越高效，但不会越用越臃肿*
+
+[![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC_BY--SA_4.0-lightgrey.svg)](LICENSE)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-Skill_Pattern-blue.svg)](https://docs.anthropic.com/en/docs/claude-code)
+[![Paper](https://img.shields.io/badge/arXiv-2507.21046v4-b31b1b.svg)](2507.21046v4.pdf)
+
+</div>
+
+> [!NOTE]
+> **学术定位**：本模式对应自演化智能体研究中的 *Inter-test-time Context Evolution with Text-Feedback Governance*（跨会话上下文演化 + 文本反馈治理）。参见 Gao et al. (2026) "A Survey of Self-Evolving Agents"。
 
 ---
 
