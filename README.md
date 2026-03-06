@@ -1,3 +1,5 @@
+**[English](README.en.md)** | **中文**
+
 # Self-Evolving Skill 设计模式
 
 > 一种让 Claude Code Skill 在使用中自我进化的设计模式。
@@ -12,6 +14,28 @@
 传统 Skill 是静态的——作者打包一次，使用者反复调用，知识不会增长。
 
 但在数据库调查、代码分析、业务系统对接等领域，**AI 在使用过程中会不断发现有价值的领域知识**（表关系、查询模式、业务规则、数据特征）。这些知识如果不沉淀，每次新会话都要从零推导，造成重复劳动和上下文浪费。
+
+## 快速开始
+
+**这个模式适合你吗？** 问自己两个问题：
+1. 领域知识会随着使用而增长吗？
+2. 这种增长有自然上限吗？
+
+如果两个答案都是"是"，本模式适合你。
+
+```
+skill-name/
+├── SKILL.md                        # 触发条件 + 治理协议
+├── scripts/                        # 执行工具
+└── references/                     # 活的知识库（AI 维护）
+    ├── _index.md                   # 路由表（<40行）
+    ├── schema_map.md               # 结构知识
+    ├── query_patterns.md           # 可复用查询模板
+    ├── business_rules.md           # 已确认的业务规则
+    └── investigation_flows.md      # 多步调查工作流
+```
+
+---
 
 ## 2. 设计哲学
 
@@ -109,10 +133,10 @@ skill-name/
 
 | 层次 | 存什么 | 对应文件 | 示例 |
 |------|--------|---------|------|
-| **结构知识** | 表/SP/数据库的静态关系 | `schema_map.md` | "invoice.ban_id 关联 ban.id" |
-| **业务规则** | 从交互中确认的稳定规则 | `business_rules.md` | "ban 找不到时跳过，不注册 invoice" |
-| **查询模板** | 单步查询的可复用 SQL | `query_patterns.md` | "按 status 统计 CABS invoice" |
-| **调查工作流** | 多步调查的可复用流程 | `investigation_flows.md` | "排查 invoice 重复：Step1 查 ban → Step2 查去重条件 → Step3 对比结果" |
+| **结构知识** | 表/SP/数据库的静态关系 | `schema_map.md` | "orders.customer_id 关联 customers.id" |
+| **业务规则** | 从交互中确认的稳定规则 | `business_rules.md` | "customer 找不到时跳过，不创建 order" |
+| **查询模板** | 单步查询的可复用 SQL | `query_patterns.md` | "按 status 统计订单数量" |
+| **调查工作流** | 多步调查的可复用流程 | `investigation_flows.md` | "排查重复订单：Step1 查 customer → Step2 查去重条件 → Step3 对比结果" |
 
 **层次间的关系**：
 
@@ -272,7 +296,23 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 - 知识完全确定的 Skill（如编码规范 — 规则不因使用而变化）
 - 知识无上限增长的场景（需要模型级别的演化，不适合 Skill 层面）
 
-## 12. 实施清单
+## 12. 参考实现
+
+本仓库包含一个完整的参考实现：[`skills/db-investigator/`](skills/db-investigator/)
+
+这是一个面向 MySQL 数据库调查的 Self-Evolving Skill，展示了：
+
+| 组件 | 文件 | 说明 |
+|------|------|------|
+| Skill 定义 | [`SKILL.md`](skills/db-investigator/SKILL.md) | frontmatter（触发条件）+ body（工具选择、五道门协议、扩展规则） |
+| 知识路由 | [`references/_index.md`](skills/db-investigator/references/_index.md) | 路由表示例 |
+| 领域知识 | [`references/*.md`](skills/db-investigator/references/) | 四层记忆模型的文件示例（含模板占位内容） |
+| 执行工具 | [`scripts/`](skills/db-investigator/scripts/) | 三个只读工具：数据查询、结构获取、元数据索引 |
+| 结构缓存 | [`db_schemas/`](skills/db-investigator/db_schemas/) | 工具输出的离线缓存目录 |
+
+> references/ 中的内容为模板示例。实际使用时，AI 会在真实交互中通过五道门协议逐步填充真实的领域知识。
+
+## 13. 实施清单
 
 从零构建一个 Self-Evolving Skill：
 
@@ -307,9 +347,24 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
    - 成熟后趋于稳定，只在业务变化时更新
 ```
 
-## 13. 论文参考
+## 14. 论文参考
 
-- Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4.
+- Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4. ([PDF](2507.21046v4.pdf))
 - 本模式主要关联论文 Section 3.2 (Context Evolution: Memory + Prompt) 和 Section 4.2 (Inter-test-time Evolution)。
 - 五道门协议与论文中 Mem0 的记忆管理操作（ADD/MERGE/UPDATE/DELETE）理念一致，但增加了更系统化的治理结构。
 - 记忆层次模型受论文中 MUSE 的分层记忆架构（strategic/procedural/tool-use）启发，适配为 Skill 场景的四层结构。
+
+## 15. 贡献
+
+本模式源自电信费用管理领域（数据库调查与计费审计场景）的真实实践。欢迎通过 Issues 和 PRs 提交反馈、案例分享和领域适配方案。
+
+如果你将本模式应用到了新的领域，欢迎分享：
+- 你应用到了什么领域
+- 花了多长时间到达「成熟期」
+- 五道门中哪一道在你的场景里触发最频繁
+
+## 16. 许可证
+
+本项目采用 [CC BY-SA 4.0](LICENSE) 许可证。
+
+Self-Evolving Skill 设计模式（包括五道门治理协议、三级渐进式加载架构、选择性注入机制、记忆层次模型、成熟度阶段框架等）为作者原创。该模式独立构思后，与 Gao et al. (2026) 的自演化智能体综述进行了学术对标。论文讨论的是智能体/模型参数层面的自演化；本模式的独特贡献在于将自演化原则应用于 Skill 层（提示词注入层），完全在上下文窗口内运作，不涉及模型权重或系统架构的修改。
