@@ -9,7 +9,7 @@
 
 [![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC_BY--SA_4.0-lightgrey.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Skill_Pattern-blue.svg)](https://docs.anthropic.com/en/docs/claude-code)
-[![Paper](https://img.shields.io/badge/arXiv-2507.21046v4-b31b1b.svg)](2507.21046v4.pdf)
+[![Paper](https://img.shields.io/badge/arXiv-2507.21046v4-b31b1b.svg)](https://arxiv.org/abs/2507.21046)
 
 </div>
 
@@ -324,7 +324,7 @@ A Self-Evolving Skill for MySQL database investigation, demonstrating:
 
 ## References
 
-- Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4. ([PDF](2507.21046v4.pdf))
+- Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4. ([arXiv](https://arxiv.org/abs/2507.21046))
 - This pattern primarily relates to Section 3.2 (Context Evolution: Memory + Prompt) and Section 4.2 (Inter-test-time Evolution) of the above survey.
 - The Five-Gate protocol aligns with the memory management operations (ADD / MERGE / UPDATE / DELETE) described in Mem0, with a more systematic governance structure layered on top.
 - The memory layer model is inspired by MUSE's hierarchical memory architecture (strategic / procedural / tool-use), adapted for the Skill context as a four-layer structure.

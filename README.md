@@ -9,7 +9,7 @@
 
 [![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC_BY--SA_4.0-lightgrey.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Skill_Pattern-blue.svg)](https://docs.anthropic.com/en/docs/claude-code)
-[![Paper](https://img.shields.io/badge/arXiv-2507.21046v4-b31b1b.svg)](2507.21046v4.pdf)
+[![Paper](https://img.shields.io/badge/arXiv-2507.21046v4-b31b1b.svg)](https://arxiv.org/abs/2507.21046)
 
 </div>
 
@@ -358,7 +358,7 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 
 ## 14. 论文参考
 
-- Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4. ([PDF](2507.21046v4.pdf))
+- Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4. ([arXiv](https://arxiv.org/abs/2507.21046))
 - 本模式主要关联论文 Section 3.2 (Context Evolution: Memory + Prompt) 和 Section 4.2 (Inter-test-time Evolution)。
 - 五道门协议与论文中 Mem0 的记忆管理操作（ADD/MERGE/UPDATE/DELETE）理念一致，但增加了更系统化的治理结构。
 - 记忆层次模型受论文中 MUSE 的分层记忆架构（strategic/procedural/tool-use）启发，适配为 Skill 场景的四层结构。
