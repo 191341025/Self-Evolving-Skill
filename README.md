@@ -1,11 +1,11 @@
 <div align="center">
 
-# Self-Evolving Skill 设计模式
+# Self-Evolving Skill Pattern
 
-**[English](README.en.md)** | **中文**
+**English** | **[中文](README.zh.md)**
 
-*一种让 Claude Code Skill 在使用中自我进化的设计模式*
-*越用越准确、越用越高效，但不会越用越臃肿*
+*A design pattern for Claude Code Skills that improve through use —*
+*growing more accurate and efficient over time, without bloating.*
 
 [![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC_BY--SA_4.0-lightgrey.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Skill_Pattern-blue.svg)](https://docs.anthropic.com/en/docs/claude-code)
@@ -14,378 +14,350 @@
 </div>
 
 > [!NOTE]
-> **学术定位**：本模式对应自演化智能体研究中的 *Inter-test-time Context Evolution with Text-Feedback Governance*（跨会话上下文演化 + 文本反馈治理）。参见 Gao et al. (2026) "A Survey of Self-Evolving Agents"。
+> **Academic positioning:** This pattern corresponds to *Inter-test-time Context Evolution with Text-Feedback Governance* in the self-evolving agent literature. See Gao et al. (2026) "A Survey of Self-Evolving Agents."
 
 ---
 
-## 1. 问题
+## The Problem
 
-传统 Skill 是静态的——作者打包一次，使用者反复调用，知识不会增长。
+Traditional Skills are static — an author packages them once, users invoke them repeatedly, and knowledge never grows.
 
-但在数据库调查、代码分析、业务系统对接等领域，**AI 在使用过程中会不断发现有价值的领域知识**（表关系、查询模式、业务规则、数据特征）。这些知识如果不沉淀，每次新会话都要从零推导，造成重复劳动和上下文浪费。
+But in domains like database investigation, codebase analysis, and business system integration, **an AI continuously discovers valuable domain knowledge during use** — table relationships, query patterns, business rules, data characteristics. Without a way to persist this knowledge, every new session starts from zero, wasting both effort and context window.
 
-## 快速开始
+---
 
-**这个模式适合你吗？** 问自己两个问题：
-1. 领域知识会随着使用而增长吗？
-2. 这种增长有自然上限吗？
+## Quick Start
 
-如果两个答案都是"是"，本模式适合你。
+**Is this pattern right for your use case?** Ask two questions:
+1. Will domain knowledge grow through use?
+2. Does that growth have a natural ceiling?
+
+If both answers are yes, this pattern fits.
 
 ```
 skill-name/
-├── SKILL.md                        # 触发条件 + 治理协议
-├── scripts/                        # 执行工具
-└── references/                     # 活的知识库（AI 维护）
-    ├── _index.md                   # 路由表（<40行）
-    ├── schema_map.md               # 结构知识
-    ├── query_patterns.md           # 可复用查询模板
-    ├── business_rules.md           # 已确认的业务规则
-    └── investigation_flows.md      # 多步调查工作流
+├── SKILL.md                        # Trigger conditions + governance protocol
+├── scripts/                        # Execution tools
+└── references/                     # Living knowledge base (AI-maintained)
+    ├── _index.md                   # Routing table (<40 lines)
+    ├── schema_map.md               # Structural knowledge
+    ├── query_patterns.md           # Reusable query templates
+    ├── business_rules.md           # Confirmed business logic
+    └── investigation_flows.md      # Multi-step reusable workflows
 ```
 
 ---
 
-## 2. 设计哲学
+## The Five-Gate Governance Protocol
 
-### 2.1 三层进化论
-
-> **成长的目的不是成长本身，而是随业务一起成长。**
-
-本模式的设计哲学建立在三个递进层次上：
-
-**第一层：驱动力来自真实交互**
-
-进化的原始驱动力来自用户与 AI 的每一次真实对话——是业务需求在拉动知识积累，而不是机制在推动改变。没有真实交互触发的改变就不应该发生。Skill 不会自己"找事做"，它在等待真实的业务问题来驱动自己的成长。
-
-这与论文中"主动探索"机制不同。论文描述的 Voyager 等系统会自主探索未知领域，但那适用于模型参数级别的自演化。对于 Skill 这种提示词注入层，进化的信号应该来自真实业务场景，而非人造的探索任务。
-
-**第二层：选择性成长**
-
-不是每次交互都要改变什么。"入库比出库难"——五道门协议的每一道都在问"你真的需要加这个吗？"论文将此称为 *Selective Evolution*（选择性演化），区别于 *Continuous Evolution*（持续演化）。
-
-高质量的不变比低质量的改变更有价值。一条精确的规则胜过十条模糊的笔记。
-
-**第三层：成熟即稳定**
-
-一个足够成熟的 Skill 停止成长是健康的、正常的终态，不是失败。当领域知识已经覆盖了日常场景的 90%+，Skill 应该趋于稳定。只有业务本身发生变化（新表、新规则、新流程）时，才需要新一轮成长。
-
-这与论文描述的"稳定性-可塑性困境"相呼应：过度的可塑性（不断改变）会导致灾难性遗忘；适时的稳定才是成熟系统的标志。
-
-### 2.2 核心思想
-
-将 Claude 官方 Skill 的**三级渐进式披露（Progressive Disclosure）** 与**知识治理协议**结合，构建一个能在使用中选择性进化的 Skill。
-
-关键洞察：Skill 本质上是 system prompt 与 user prompt 之间的**提示词注入层**。注入的内容必须高价值、精准、不臃肿。因此领域知识不能是"发现什么就追加什么"的日志，而是一个有结构、有治理、有选择性注入能力的知识体系。
-
-### 2.3 与论文的对标
-
-论文提出自演化智能体的四维分类框架（What / When / How / Where），本模式在每个维度上的定位如下：
-
-| 维度 | 论文的完整光谱 | 本模式的定位 | 设计理由 |
-|------|--------------|-------------|---------|
-| **What**（演化什么） | 模型参数 / 上下文 / 工具 / 架构 | **上下文（记忆 + 提示词）** + 轻量级工具经验 | Skill 无法修改模型参数或架构，上下文是唯一可持久化的演化位点 |
-| **When**（何时演化） | Intra-test-time / Inter-test-time | **Inter-test-time**（跨会话） | 知识在 references/ 中持久化，跨会话复用 |
-| **How**（怎么演化） | 奖励驱动 / 模仿学习 / 种群进化 | **文本反馈驱动 + 五道门治理** | AI 的判断力作为"奖励信号"，五道门作为治理约束 |
-| **Where**（在哪演化） | 通用 / 专用领域 | **专用领域**（如数据库调查） | 领域知识在使用中增长的场景 |
-
-**有意不做的事**：
-
-- 不改模型参数 — Skill 层面无此能力，也不需要
-- 不做架构搜索 — Skill 的结构是稳定的，变化的是知识内容
-- 不做主动探索 — 进化驱动力来自真实交互，不自造任务
-- 不追求持续成长 — 成熟后趋于稳定是目标，不是问题
-
-## 3. 架构
+This is the core of the pattern. It prevents the knowledge base from degrading into noise.
 
 ```
-skill-name/
-├── SKILL.md
-│   ├── frontmatter (第一级 -- 始终注入 system prompt)
-│   │   ├── 触发条件      什么场景激活此 Skill
-│   │   └── 行为准则      AI 应该怎么做（如"先查后问"）
-│   │
-│   └── body (第二级 -- 任务匹配时加载)
-│       ├── 工具选择表        哪个工具解决哪类问题
-│       ├── 选择性加载协议    先读 _index.md，按需加载主题文件
-│       ├── 知识治理协议      五道门控制知识增删改
-│       └── 扩展规则          何时拆分、何时合并、容量上限
-│
-├── references/ (第三级 -- 按需导航，AI 持续维护)
-│   ├── _index.md             路由表（轻量，<40行）
-│   ├── schema_map.md         结构知识
-│   ├── query_patterns.md     查询模板
-│   ├── business_rules.md     业务规则
-│   └── investigation_flows.md 调查工作流（可复用的多步调查流程）
-│
-├── scripts/ (第三级 -- 执行工具)
-│   └── *.py
-│
-└── db_schemas/ (第三级 -- 缓存)
-    └── ...
+Gate 1 — VALUE
+  Q: Can this knowledge be reused across sessions?
+  → One-time result (e.g., "query returned 42 rows at 3pm") → REJECT
+  → Reusable pattern or stable fact → PASS
+
+Gate 2 — ALIGNMENT
+  Q: Does this contradict existing knowledge?
+  → Contradiction found → CORRECT the existing entry (don't append)
+  → Consistent → PASS
+
+Gate 3 — REDUNDANCY
+  Q: Does this already exist, possibly worded differently?
+  → Exists → MERGE into existing entry, or skip
+  → Doesn't exist → PASS
+
+Gate 4 — FRESHNESS
+  Q: Is this time-sensitive data?
+  → Yes → Tag with date (YYYY-MM-DD); future sessions can identify and clean stale data
+  → No → Store as stable fact → PASS
+
+Gate 5 — PLACEMENT
+  Q: Which file does this belong in? Which memory layer?
+  → Existing topic → Add to that file
+  → New topic → Only create a new file if 3+ related entries exist; update _index.md
 ```
 
-### 三级加载机制
+**The most common outcome of the Five Gates is: do nothing.** Most interactions don't produce knowledge worth storing. The protocol's primary job is to reject, not to accept.
 
-| 层级 | 加载时机 | 内容定位 | 变化频率 |
-|------|---------|---------|---------|
-| 第一级 frontmatter | 始终在 system prompt | "什么时候用、怎么用" | 极少变化 |
-| 第二级 body | Claude 判断任务相关时 | "用什么工具、怎么治理知识" | 稳定 |
-| 第三级 references/ | Claude 按需导航 | "领域知识本体" | **选择性进化** |
-| 第三级 scripts/ | Claude 按需调用 | 执行工具 | 按需扩展 |
+### Governance Capabilities
 
-**关键区别**：传统 Skill 的第三级是静态参考文档；Self-Evolving Skill 的第三级是**活的知识库**，由 AI 在使用中按治理协议维护。
+| Capability | Mechanism |
+|------------|-----------|
+| Add knowledge | Must pass all five gates |
+| Correct errors | Gate 2 detects contradictions; fix in place |
+| Deduplicate | Gate 3 merges rather than appends |
+| Expire stale data | Gate 4 date-tags; sessions identify and clean outdated entries |
+| Maintain structure | Gate 5 + scaling rules control file granularity |
 
-## 4. 记忆层次模型
+---
 
-论文（Gao et al.）描述了从原始记忆到工作流记忆的三级层次。本模式采纳并适配为 Skill 场景：
+## Architecture
 
-| 层次 | 存什么 | 对应文件 | 示例 |
-|------|--------|---------|------|
-| **结构知识** | 表/SP/数据库的静态关系 | `schema_map.md` | "orders.customer_id 关联 customers.id" |
-| **业务规则** | 从交互中确认的稳定规则 | `business_rules.md` | "customer 找不到时跳过，不创建 order" |
-| **查询模板** | 单步查询的可复用 SQL | `query_patterns.md` | "按 status 统计订单数量" |
-| **调查工作流** | 多步调查的可复用流程 | `investigation_flows.md` | "排查重复订单：Step1 查 customer → Step2 查去重条件 → Step3 对比结果" |
+### Three-Level Loading
 
-**层次间的关系**：
+| Level | Loaded when | Content | Change frequency |
+|-------|-------------|---------|-----------------|
+| Level 1: frontmatter | Always, in system prompt | "When to use this Skill, how to behave" | Rarely changes |
+| Level 2: body | When Claude judges the task is relevant | "Which tools, how to govern knowledge" | Stable |
+| Level 3: references/ | Claude navigates on demand | **Living domain knowledge** | Selective evolution |
+| Level 3: scripts/ | Claude invokes on demand | Execution tools | Extend as needed |
 
-```
-结构知识（What exists）
-  → 为查询模板提供正确的表名和字段名
-    → 为调查工作流提供可组合的查询步骤
-      → 业务规则贯穿所有层次，约束查询的条件和判断的逻辑
-```
+**The key distinction:** A traditional Skill's Level 3 is static reference documentation. A Self-Evolving Skill's Level 3 is a living knowledge base, maintained by the AI under the governance protocol.
 
-**进化方向**：知识通常从低层次向高层次提炼。一次成功的调查可能先补充 `schema_map.md`（发现了新的表关系），再形成 `query_patterns.md`（提炼了有效的查询），最终整理为 `investigation_flows.md`（沉淀了完整的调查流程）。但不是每次都要走完全程——如果只是补充了一个字段名，记在 `schema_map.md` 就够了。
+### Selective Injection via Routing Table
 
-## 5. 知识治理协议
-
-这是模式的核心——防止知识库从"进化"劣化为"膨胀"。
-
-### 五道门（按顺序，缺一不可）
+Knowledge is loaded by route, not in bulk:
 
 ```
-Gate 1 -- VALUE（价值）
-  问: 这条知识能跨会话复用吗？
-  → 一次性查询结果（如"3点跑了个SQL得到42"）→ 不入库
-  → 可复用的模式或稳定事实 → 通过
-
-Gate 2 -- ALIGNMENT（对齐）
-  问: 与已有知识矛盾吗？
-  → 矛盾 → 纠正已有知识（不是追加新条目）
-  → 一致 → 通过
-
-Gate 3 -- REDUNDANCY（冗余）
-  问: 已经存在了吗（可能不同措辞）？
-  → 存在 → 合并到已有条目，或跳过
-  → 不存在 → 通过
-
-Gate 4 -- FRESHNESS（时效）
-  问: 是时间敏感的数据吗？
-  → 是 → 标注日期 (YYYY-MM-DD)，后续会话可识别并清理过时数据
-  → 否 → 作为稳定事实入库
-
-Gate 5 -- PLACEMENT（归位）
-  问: 放哪个主题文件？放哪个记忆层次？
-  → 已有主题 → 加入对应文件
-  → 需要新主题 → 仅当 3+ 条相关知识才新建文件，同步更新 _index.md
-```
-
-### 治理能力汇总
-
-| 能力 | 实现方式 |
-|------|---------|
-| 新增知识 | 通过五道门后入库 |
-| 纠错 | Gate 2 发现矛盾时，修正已有条目 |
-| 去重 | Gate 3 检测冗余，合并而非追加 |
-| 过期清理 | Gate 4 标注日期，后续识别陈旧数据 |
-| 结构维护 | Gate 5 + 扩展规则，控制文件粒度 |
-| 不变 | 五道门全部"否" → 不做任何修改（这是最常见的结果） |
-
-**关键补充**：五道门最常见的结果是**什么都不做**。大部分交互不会产生值得入库的新知识，这是正常的、健康的。治理协议的首要职责是"拒绝"，其次才是"接纳"。
-
-## 6. 选择性注入
-
-领域知识的加载不是全量的，而是**路由式**的：
-
-```
-Skill 被触发
+Skill triggered
     ↓
-读 _index.md（路由表，<40行，列出所有主题 + 一句话摘要）
+Read _index.md (routing table, <40 lines, topic list + one-line summaries)
     ↓
-根据当前对话主题，判断需要哪个主题文件
+Determine which topic files are relevant to the current conversation
     ↓
-只读取相关的 1-2 个主题文件
+Load only 1–2 relevant topic files
     ↓
-不相关的主题文件不加载，节省上下文
+Irrelevant files are not loaded — context window preserved
 ```
 
-**为什么不全量加载**：Skill 是提示词注入，上下文窗口是有限资源。当知识库增长到 5 个主题文件、每个 50-80 行时，全量加载就是 250-400 行的浪费。路由表机制让注入量始终可控。
+**Why not load everything?** A Skill is a prompt injection layer — context window is a finite resource. When the knowledge base grows to 5 topic files at 50–80 lines each, bulk loading wastes 250–400 lines. The routing table keeps injection size under control regardless of how much the knowledge base grows.
 
-### 扩展规则
+### Scaling Rules
 
-- 单个主题文件超过 ~80 行 → 拆分为子主题
-- 主题文件总数超过 8 个 → 审查合并机会
-- `_index.md` 必须保持 <40 行（纯路由，不放细节）
+- Single topic file exceeds ~80 lines → split into sub-topics
+- Total topic files exceed 8 → review for merge opportunities
+- `_index.md` must stay under 40 lines (routing only, no detail)
 
-## 7. 工具经验沉淀
+---
 
-论文描述了工具演化的三阶段：创建 → 精通 → 管理选择。本模式不追求完整的工具演化（Skill 层面不适合自动创建/修改脚本），但支持**轻量级的工具使用经验沉淀**：
+## Memory Layer Model
 
-- **有效参数组合**：某个查询脚本在特定场景下的最佳参数搭配
-- **边界条件**：已知的坑和注意事项（如"连接超时需 reconnect"）
-- **组合模式**：多个工具串联使用的有效序列
+Adapted from the hierarchical memory architecture described in Gao et al. (2026):
 
-这些经验记录在 `query_patterns.md` 或 `investigation_flows.md` 中，以注释形式标注，不单独建文件。
+| Layer | What it stores | File | Example |
+|-------|---------------|------|---------|
+| **Structural knowledge** | Static relationships between tables, SPs, databases | `schema_map.md` | "orders.customer_id references customers.id" |
+| **Business rules** | Stable rules confirmed through interaction | `business_rules.md` | "Skip if customer not found; don't create order" |
+| **Query patterns** | Reusable single-step SQL templates | `query_patterns.md` | "Count orders grouped by status" |
+| **Investigation flows** | Reusable multi-step investigation procedures | `investigation_flows.md` | "Debug duplicate orders: Step1 check customer → Step2 check dedup conditions → Step3 compare results" |
 
-目的不是让工具自动进化，而是让 AI 下次使用工具时更高效——类似于"一个熟练工人知道哪个扳手配哪个螺丝"。
+**Knowledge typically distills upward:** A successful investigation may first add to `schema_map.md` (new table relationship discovered), then `query_patterns.md` (effective query extracted), then `investigation_flows.md` (full procedure consolidated). But not every interaction completes the full chain — if you only learned a new field name, `schema_map.md` is enough.
 
-## 8. 成熟度判断
+---
 
-Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟度感知：
+## Tool Experience Accumulation
 
-### 成熟度信号
+The survey describes three stages of tool evolution: creation → mastery → management/selection. This pattern does not pursue full tool evolution (it's not appropriate for Skills to automatically create or modify scripts), but it does support **lightweight accumulation of tool-use experience**:
 
-| 信号 | 含义 |
-|------|------|
-| 新会话中，大部分数据库问题无需查 references/ 就能回答 | 知识已内化到 AI 的对话能力中 |
-| 五道门连续多次结果为"不做任何修改" | 知识库已覆盖常见场景 |
-| `_index.md` 的主题列表稳定不再变化 | 领域结构已收敛 |
-| 新增知识主要是 Gate 4 的时效性更新，而非全新事实 | 骨架稳定，只有数据在刷新 |
+- **Effective parameter combinations:** The best parameter settings for a given query script in specific scenarios
+- **Boundary conditions:** Known pitfalls and caveats (e.g., "connection timeout requires reconnect")
+- **Composition patterns:** Effective sequences for chaining multiple tools together
 
-### 成熟度阶段
+These experiences are recorded as annotations within `query_patterns.md` or `investigation_flows.md` — no separate file is created.
 
-```
-初生期：references/ 几乎为空，每次交互都可能产生新知识
-    ↓
-成长期：核心结构和规则已建立，增量放缓
-    ↓
-成熟期：知识库稳定，偶尔因业务变化更新
-    ↓
-业务变更触发：新系统上线、表结构重构等 → 局部回到成长期
-```
+The goal is not to make tools evolve autonomously, but to make the AI more efficient next time it uses a tool — like a skilled mechanic knowing which wrench fits which bolt.
 
-**不设"进化次数"或"知识条目数"等量化指标**——这些数字本身没有意义。一个只有 30 条精准规则的 Skill 远优于一个有 200 条杂乱笔记的 Skill。
+---
 
-## 9. 误演化防护
+## Design Philosophy
 
-论文提出了"误演化（Misevolution）"概念——自演化过程中系统质量退化。在 Skill 场景中，误演化的表现为：
+### Three Principles
 
-| 风险 | 表现 | 防护 |
-|------|------|------|
-| 知识污染 | 错误的规则被写入，导致后续会话产生错误判断 | Gate 2（ALIGNMENT）+ 用户确认关键业务规则 |
-| 信息膨胀 | 大量低价值知识堆积，淹没真正重要的规则 | Gate 1（VALUE）+ Gate 3（REDUNDANCY）+ 扩展规则 |
-| 过时未清理 | 旧版本的表结构、已废弃的 SP 仍在知识库中 | Gate 4（FRESHNESS）+ 日期标注 + 业务变更时主动审查 |
-| 指令混乱 | SKILL.md 的指令与 references/ 的知识互相矛盾 | SKILL.md 极少变化，references/ 通过路由隔离 |
+**1. Evolution is demand-driven, not self-initiated**
 
-**最根本的防护**：Skill 的进化完全在 AI 的上下文层面发生，不修改模型参数，不修改系统架构。即使知识库出现问题，最坏情况是"给了一条错误的参考信息"，而不是"模型行为不可逆地改变了"。这是 Skill 级别自演化相比模型级别自演化的天然安全优势。
+Every change must be triggered by real user interaction — business needs pull knowledge accumulation, not the mechanism itself pushing changes. A Skill doesn't go looking for things to learn. It waits for real business problems to drive its growth.
 
-## 10. 与传统 Skill 的对比
+This is a deliberate divergence from academic systems like Voyager, which autonomously explore. Those systems operate at the model parameter level. At the Skill (prompt injection) level, evolution signals should come from real business scenarios, not artificially generated exploration tasks.
 
-| | 传统 Skill | Self-Evolving Skill |
-|--|-----------|-------------------|
-| **知识来源** | 作者预设 | 预设 + AI 使用中积累 |
-| **生命周期** | 创建后不变 | 选择性进化 → 趋于成熟 |
-| **质量控制** | 作者人工维护 | 五道门协议自治 |
-| **上下文效率** | body 全量注入 | 路由表 + 选择性注入 |
-| **跨项目复用** | 复制整个 Skill | 复制 Skill 骨架 + 清空 references，在新项目从零积累 |
-| **跨会话连续性** | 无 | 知识在 references/ 中持久化 |
-| **终态** | 永远不变 | 成熟后趋于稳定（不变 = 成功） |
+**2. Selective growth, not continuous growth**
 
-## 11. 适用场景
+Not every interaction should change anything. "Admission is harder than deletion" — each of the five gates asks "do you really need to add this?" The survey literature calls this *Selective Evolution* vs. *Continuous Evolution*. A stable, high-quality rule beats ten vague notes.
 
-**适用**：
-- 数据库调查 — 表关系、查询模式随使用积累
-- 代码库分析 — 架构理解随深入逐步完善
-- 业务系统对接 — 业务规则在沟通中逐步确认
-- 任何**领域知识在使用中会增长、且增长有上限**的场景
+**3. Maturity means stability**
 
-**不适用**：
-- 纯工具型 Skill（如 PDF 读取器 — 没有领域知识积累的需要）
-- 知识完全确定的 Skill（如编码规范 — 规则不因使用而变化）
-- 知识无上限增长的场景（需要模型级别的演化，不适合 Skill 层面）
+A sufficiently mature Skill that stops growing is healthy — it's the intended end state, not a failure. When domain knowledge covers 90%+ of everyday scenarios, the Skill should converge. New growth is only triggered when the business itself changes (new tables, new rules, new processes).
 
-## 12. 参考实现
+This directly addresses the stability-plasticity dilemma described in the literature: excessive plasticity (constant change) causes catastrophic forgetting; timely stability is the mark of a mature system.
 
-本仓库包含一个完整的参考实现：[`examples/db-investigator/`](examples/db-investigator/)
+### Positioning Against the Academic Framework
 
-这是一个面向 MySQL 数据库调查的 Self-Evolving Skill，展示了：
+From Gao et al. (2026)'s four-dimensional classification:
 
-| 组件 | 文件 | 说明 |
-|------|------|------|
-| Skill 定义 | [`SKILL.md`](examples/db-investigator/SKILL.md) | frontmatter（触发条件）+ body（工具选择、五道门协议、扩展规则） |
-| 知识路由 | [`references/_index.md`](examples/db-investigator/references/_index.md) | 路由表示例 |
-| 领域知识 | [`references/*.md`](examples/db-investigator/references/) | 四层记忆模型的文件示例（含模板占位内容） |
-| 执行工具 | [`scripts/`](examples/db-investigator/scripts/) | 三个只读工具：数据查询、结构获取、元数据索引 |
-| 结构缓存 | [`db_schemas/`](examples/db-investigator/db_schemas/) | 工具输出的离线缓存目录 |
+| Dimension | Full spectrum (paper) | This pattern's position | Design rationale |
+|-----------|-----------------------|------------------------|-----------------|
+| **What** evolves | Model weights / context / tools / architecture | **Context (memory + prompts)** + lightweight tool experience | Skills cannot modify model weights or architecture; context is the only persistable evolution site |
+| **When** to evolve | Intra-test-time / Inter-test-time | **Inter-test-time** (cross-session) | Knowledge persists in references/ and is reused across sessions |
+| **How** to evolve | Reward-driven / imitation learning / population evolution | **Text-feedback + Five-Gate governance** | AI judgment as "reward signal"; Five Gates as governance constraint |
+| **Where** to evolve | General / specialized domains | **Specialized domains** (e.g., database investigation) | Domains where knowledge grows through use |
 
-> references/ 中的内容为模板示例。实际使用时，AI 会在真实交互中通过五道门协议逐步填充真实的领域知识。
+**Intentional non-goals:**
+- No model weight modification — not possible or necessary at the Skill layer
+- No architecture search — Skill structure is stable; only knowledge content changes
+- No autonomous exploration — evolution is driven by real interaction, not self-generated tasks
+- No perpetual growth — convergence to stability is the goal, not a problem
 
-## 13. 实证验证
+---
 
-我们在真实数据库上进行了完整的进化实验，验证设计模式的实际效果。
+## Misevolution Protection
 
-**→ [查看全部实验数据](experiments/)**
+The survey literature introduces *Misevolution* — quality degradation during self-evolution. In the Skill context:
 
-| 实验 | 领域 | 轮次 | 核心结论 |
-|------|------|------|---------|
-| [#01 nan-platform](experiments/01-nan-platform/) | 智能楼宇管理 (29表) | 5轮 | 拒绝率 63.6%，增量 +75→+1 收敛，Gate 2 自我纠错 2 次 |
+| Risk | Manifestation | Protection |
+|------|---------------|------------|
+| Knowledge pollution | Incorrect rules written in, causing downstream errors | Gate 2 (ALIGNMENT) + user confirmation for critical business rules |
+| Information bloat | Low-value knowledge accumulates, burying important rules | Gate 1 (VALUE) + Gate 3 (REDUNDANCY) + scaling rules |
+| Stale data | Deprecated table structures or SPs remain in knowledge base | Gate 4 (FRESHNESS) + date tagging + proactive review on business changes |
+| Instruction conflict | SKILL.md instructions contradict references/ knowledge | SKILL.md changes rarely; references/ isolated via routing |
 
-每个实验包含完整的进化日志、五道门决策记录、质量审计报告和每轮知识快照，可逐步 diff 观察 Skill 的知识增长过程。
+**The fundamental safety advantage:** A Self-Evolving Skill operates entirely at the context layer. It does not modify model parameters or system architecture. Even if the knowledge base develops an error, the worst case is "one bad reference fact" — not "irreversible behavioral change in the model." This is a natural safety advantage over model-level self-evolution.
 
-## 14. 实施清单
+---
 
-从零构建一个 Self-Evolving Skill：
+## Maturity Signals
+
+No KPI-style metrics are needed. Watch for these qualitative signals:
+
+| Signal | Meaning |
+|--------|---------|
+| Most database questions can be answered without consulting references/ | Knowledge has been internalized into conversational capability |
+| Five Gates repeatedly return "do nothing" | Knowledge base covers common scenarios |
+| `_index.md` topic list has stabilized | Domain structure has converged |
+| New knowledge is mostly Gate 4 freshness updates, not new facts | Framework is stable; only data is refreshing |
+
+### Maturity Stages
 
 ```
-1. 明确领域边界
-   问自己：这个领域的知识会随使用增长吗？增长有上限吗？
-   如果两个答案都是"是"，适合用本模式。
+Nascent:  references/ nearly empty; most interactions produce new knowledge
+    ↓
+Growing:  Core structure and rules established; new additions slowing
+    ↓
+Mature:   Knowledge base stable; updates only on business changes
+    ↓
+Business change triggers: new systems, schema refactors → partial return to Growing
+```
 
-2. 创建目录结构
+---
+
+## Comparison with Traditional Skills
+
+| | Traditional Skill | Self-Evolving Skill |
+|--|------------------|-------------------|
+| **Knowledge source** | Author-defined at creation | Predefined + accumulated through use |
+| **Lifecycle** | Fixed after creation | Selective evolution → convergence to maturity |
+| **Quality control** | Manual author maintenance | Five-Gate protocol (self-governing) |
+| **Context efficiency** | Full body injection | Routing table + selective injection |
+| **Cross-project reuse** | Copy entire Skill | Copy Skill skeleton + clear references/; accumulate fresh in new project |
+| **Cross-session continuity** | None | Knowledge persists in references/ |
+| **End state** | Never changes | Stable (not changing = success) |
+
+---
+
+## When to Use (and When Not To)
+
+**Use this pattern when:**
+- Database investigation — table relationships and query patterns accumulate through use
+- Codebase analysis — architectural understanding deepens over time
+- Business system integration — business rules get confirmed through conversation
+- Any domain where **knowledge grows through use and has a natural ceiling**
+
+**Don't use this pattern when:**
+- Pure tool Skills (e.g., a PDF reader — no domain knowledge to accumulate)
+- Fully predetermined knowledge Skills (e.g., coding style guides — rules don't change through use)
+- Unbounded knowledge growth scenarios (these require model-level evolution, not Skill-level)
+
+---
+
+## Reference Implementation
+
+This repository includes a complete reference implementation: [`examples/db-investigator/`](examples/db-investigator/)
+
+A Self-Evolving Skill for MySQL database investigation, demonstrating:
+
+| Component | File | Description |
+|-----------|------|-------------|
+| Skill definition | [`SKILL.md`](examples/db-investigator/SKILL.md) | frontmatter (triggers) + body (tool selection, Five-Gate protocol, scaling rules) |
+| Knowledge routing | [`references/_index.md`](examples/db-investigator/references/_index.md) | Routing table example |
+| Domain knowledge | [`references/*.md`](examples/db-investigator/references/) | Four-layer memory model file examples (with template placeholders) |
+| Execution tools | [`scripts/`](examples/db-investigator/scripts/) | Three read-only tools: data query, structure fetch, metadata index |
+| Structure cache | [`db_schemas/`](examples/db-investigator/db_schemas/) | Offline cache directory for tool outputs |
+
+> The references/ files contain template examples. In real use, the AI populates them with actual domain knowledge through the Five-Gate protocol during real interactions.
+
+---
+
+## Empirical Validation
+
+We ran full evolution experiments on real databases to validate the design pattern.
+
+**→ [View all experiment data](experiments/)**
+
+| Experiment | Domain | Rounds | Key Findings |
+|-----------|--------|--------|-------------|
+| [#01 nan-platform](experiments/01-nan-platform/) | Smart Building Mgmt (29 tables) | 5 | 63.6% rejection rate, increments converge +75→+1, 2 Gate 2 self-corrections |
+
+Each experiment includes full evolution logs, Five-Gate decision records, quality audits, and per-round knowledge snapshots — you can diff any two rounds to observe exactly how the Skill's knowledge grew.
+
+---
+
+## Implementation Checklist
+
+```
+1. Define domain boundaries
+   Ask: Will knowledge grow through use? Does growth have a ceiling?
+   If both yes → proceed.
+
+2. Create directory structure
    skill-name/
    ├── SKILL.md
    ├── scripts/
    └── references/
        └── _index.md
 
-3. 编写 SKILL.md
-   - frontmatter: 触发条件 + 行为准则
-   - body: 工具选择 + 知识治理协议 + 扩展规则
+3. Write SKILL.md
+   - frontmatter: trigger conditions + behavioral guidelines
+   - body: tool selection + Five-Gate governance protocol + scaling rules
 
-4. 初始化 references/
-   - _index.md: 空路由表
-   - 0-2 个初始主题文件（如果有已知的领域知识）
+4. Initialize references/
+   - _index.md: empty routing table
+   - 0–2 initial topic files (if domain knowledge is already known)
 
-5. 开始使用
-   - AI 在真实交互中发现有价值的知识
-   - 通过五道门评估后写入对应主题文件
-   - 更新 _index.md
+5. Begin using
+   - AI discovers valuable knowledge through real interactions
+   - Knowledge passes through Five Gates before being written
+   - _index.md updated accordingly
 
-6. 自然收敛
-   - 知识选择性增长，五道门防止膨胀
-   - 达到阈值时自动拆分或合并
-   - 成熟后趋于稳定，只在业务变化时更新
+6. Let it converge naturally
+   - Knowledge grows selectively; Five Gates prevent bloat
+   - Files split or merge when thresholds are reached
+   - Mature Skill stabilizes; updates only when the business changes
 ```
 
-## 15. 论文参考
+---
+
+## References
 
 - Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4. ([arXiv](https://arxiv.org/abs/2507.21046))
-- 本模式主要关联论文 Section 3.2 (Context Evolution: Memory + Prompt) 和 Section 4.2 (Inter-test-time Evolution)。
-- 五道门协议与论文中 Mem0 的记忆管理操作（ADD/MERGE/UPDATE/DELETE）理念一致，但增加了更系统化的治理结构。
-- 记忆层次模型受论文中 MUSE 的分层记忆架构（strategic/procedural/tool-use）启发，适配为 Skill 场景的四层结构。
+- This pattern primarily relates to Section 3.2 (Context Evolution: Memory + Prompt) and Section 4.2 (Inter-test-time Evolution) of the above survey.
+- The Five-Gate protocol aligns with the memory management operations (ADD / MERGE / UPDATE / DELETE) described in Mem0, with a more systematic governance structure layered on top.
+- The memory layer model is inspired by MUSE's hierarchical memory architecture (strategic / procedural / tool-use), adapted for the Skill context as a four-layer structure.
 
-## 16. 贡献
+---
 
-本模式源自电信费用管理领域（数据库调查与计费审计场景）的真实实践。欢迎通过 Issues 和 PRs 提交反馈、案例分享和领域适配方案。
+## Contributing
 
-如果你将本模式应用到了新的领域，欢迎分享：
-- 你应用到了什么领域
-- 花了多长时间到达「成熟期」
-- 五道门中哪一道在你的场景里触发最频繁
+This pattern is derived from real-world use in telecom expense management (database investigation and billing audit scenarios). Feedback, case studies, and adaptations to other domains are welcome via Issues and PRs.
 
-## 17. 许可证
+If you apply this pattern to a new domain, consider sharing:
+- What domain you applied it to
+- How long it took to reach the "Mature" stage
+- Which of the Five Gates fired most frequently in your case
 
-本项目采用 [CC BY-SA 4.0](LICENSE) 许可证。
+---
 
-Self-Evolving Skill 设计模式（包括五道门治理协议、三级渐进式加载架构、选择性注入机制、记忆层次模型、成熟度阶段框架等）为作者原创。该模式独立构思后，与 Gao et al. (2026) 的自演化智能体综述进行了学术对标。论文讨论的是智能体/模型参数层面的自演化；本模式的独特贡献在于将自演化原则应用于 Skill 层（提示词注入层），完全在上下文窗口内运作，不涉及模型权重或系统架构的修改。
+## License
+
+This project is licensed under [CC BY-SA 4.0](LICENSE).
+
+The Self-Evolving Skill design pattern — including the Five-Gate Governance Protocol, three-level progressive loading architecture, selective injection mechanism, memory layer model, and maturity stage framework — is an original creation by the author. The pattern was independently conceived and subsequently positioned against the self-evolving agent survey by Gao et al. (2026). That survey addresses self-evolution at the agent and model parameter level; this pattern's distinct contribution is applying self-evolution principles to the Skill layer (prompt injection layer), operating entirely within the context window without modifying model weights or system architecture.
