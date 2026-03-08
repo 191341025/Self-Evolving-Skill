@@ -307,21 +307,33 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 
 ## 12. 参考实现
 
-本仓库包含一个完整的参考实现：[`skills/db-investigator/`](skills/db-investigator/)
+本仓库包含一个完整的参考实现：[`examples/db-investigator/`](examples/db-investigator/)
 
 这是一个面向 MySQL 数据库调查的 Self-Evolving Skill，展示了：
 
 | 组件 | 文件 | 说明 |
 |------|------|------|
-| Skill 定义 | [`SKILL.md`](skills/db-investigator/SKILL.md) | frontmatter（触发条件）+ body（工具选择、五道门协议、扩展规则） |
-| 知识路由 | [`references/_index.md`](skills/db-investigator/references/_index.md) | 路由表示例 |
-| 领域知识 | [`references/*.md`](skills/db-investigator/references/) | 四层记忆模型的文件示例（含模板占位内容） |
-| 执行工具 | [`scripts/`](skills/db-investigator/scripts/) | 三个只读工具：数据查询、结构获取、元数据索引 |
-| 结构缓存 | [`db_schemas/`](skills/db-investigator/db_schemas/) | 工具输出的离线缓存目录 |
+| Skill 定义 | [`SKILL.md`](examples/db-investigator/SKILL.md) | frontmatter（触发条件）+ body（工具选择、五道门协议、扩展规则） |
+| 知识路由 | [`references/_index.md`](examples/db-investigator/references/_index.md) | 路由表示例 |
+| 领域知识 | [`references/*.md`](examples/db-investigator/references/) | 四层记忆模型的文件示例（含模板占位内容） |
+| 执行工具 | [`scripts/`](examples/db-investigator/scripts/) | 三个只读工具：数据查询、结构获取、元数据索引 |
+| 结构缓存 | [`db_schemas/`](examples/db-investigator/db_schemas/) | 工具输出的离线缓存目录 |
 
 > references/ 中的内容为模板示例。实际使用时，AI 会在真实交互中通过五道门协议逐步填充真实的领域知识。
 
-## 13. 实施清单
+## 13. 实证验证
+
+我们在真实数据库上进行了完整的进化实验，验证设计模式的实际效果。
+
+**→ [查看全部实验数据](experiments/)**
+
+| 实验 | 领域 | 轮次 | 核心结论 |
+|------|------|------|---------|
+| [#01 nan-platform](experiments/01-nan-platform/) | 智能楼宇管理 (29表) | 5轮 | 拒绝率 63.6%，增量 +75→+1 收敛，Gate 2 自我纠错 2 次 |
+
+每个实验包含完整的进化日志、五道门决策记录、质量审计报告和每轮知识快照，可逐步 diff 观察 Skill 的知识增长过程。
+
+## 14. 实施清单
 
 从零构建一个 Self-Evolving Skill：
 
@@ -356,14 +368,14 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
    - 成熟后趋于稳定，只在业务变化时更新
 ```
 
-## 14. 论文参考
+## 15. 论文参考
 
 - Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4. ([arXiv](https://arxiv.org/abs/2507.21046))
 - 本模式主要关联论文 Section 3.2 (Context Evolution: Memory + Prompt) 和 Section 4.2 (Inter-test-time Evolution)。
 - 五道门协议与论文中 Mem0 的记忆管理操作（ADD/MERGE/UPDATE/DELETE）理念一致，但增加了更系统化的治理结构。
 - 记忆层次模型受论文中 MUSE 的分层记忆架构（strategic/procedural/tool-use）启发，适配为 Skill 场景的四层结构。
 
-## 15. 贡献
+## 16. 贡献
 
 本模式源自电信费用管理领域（数据库调查与计费审计场景）的真实实践。欢迎通过 Issues 和 PRs 提交反馈、案例分享和领域适配方案。
 
@@ -372,7 +384,7 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 - 花了多长时间到达「成熟期」
 - 五道门中哪一道在你的场景里触发最频繁
 
-## 16. 许可证
+## 17. 许可证
 
 本项目采用 [CC BY-SA 4.0](LICENSE) 许可证。
 

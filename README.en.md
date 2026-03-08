@@ -271,19 +271,33 @@ Business change triggers: new systems, schema refactors → partial return to Gr
 
 ## Reference Implementation
 
-This repository includes a complete reference implementation: [`skills/db-investigator/`](skills/db-investigator/)
+This repository includes a complete reference implementation: [`examples/db-investigator/`](examples/db-investigator/)
 
 A Self-Evolving Skill for MySQL database investigation, demonstrating:
 
 | Component | File | Description |
 |-----------|------|-------------|
-| Skill definition | [`SKILL.md`](skills/db-investigator/SKILL.md) | frontmatter (triggers) + body (tool selection, Five-Gate protocol, scaling rules) |
-| Knowledge routing | [`references/_index.md`](skills/db-investigator/references/_index.md) | Routing table example |
-| Domain knowledge | [`references/*.md`](skills/db-investigator/references/) | Four-layer memory model file examples (with template placeholders) |
-| Execution tools | [`scripts/`](skills/db-investigator/scripts/) | Three read-only tools: data query, structure fetch, metadata index |
-| Structure cache | [`db_schemas/`](skills/db-investigator/db_schemas/) | Offline cache directory for tool outputs |
+| Skill definition | [`SKILL.md`](examples/db-investigator/SKILL.md) | frontmatter (triggers) + body (tool selection, Five-Gate protocol, scaling rules) |
+| Knowledge routing | [`references/_index.md`](examples/db-investigator/references/_index.md) | Routing table example |
+| Domain knowledge | [`references/*.md`](examples/db-investigator/references/) | Four-layer memory model file examples (with template placeholders) |
+| Execution tools | [`scripts/`](examples/db-investigator/scripts/) | Three read-only tools: data query, structure fetch, metadata index |
+| Structure cache | [`db_schemas/`](examples/db-investigator/db_schemas/) | Offline cache directory for tool outputs |
 
 > The references/ files contain template examples. In real use, the AI populates them with actual domain knowledge through the Five-Gate protocol during real interactions.
+
+---
+
+## Empirical Validation
+
+We ran full evolution experiments on real databases to validate the design pattern.
+
+**→ [View all experiment data](experiments/)**
+
+| Experiment | Domain | Rounds | Key Findings |
+|-----------|--------|--------|-------------|
+| [#01 nan-platform](experiments/01-nan-platform/) | Smart Building Mgmt (29 tables) | 5 | 63.6% rejection rate, increments converge +75→+1, 2 Gate 2 self-corrections |
+
+Each experiment includes full evolution logs, Five-Gate decision records, quality audits, and per-round knowledge snapshots — you can diff any two rounds to observe exactly how the Skill's knowledge grew.
 
 ---
 
