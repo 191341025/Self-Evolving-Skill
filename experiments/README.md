@@ -1,34 +1,36 @@
-# Experiments — 实证验证
+**English** | **[中文](README.zh.md)**
 
-> Self-Evolving Skill 设计模式的实证验证。每个子目录是一次完整实验，使用不同数据库/领域测试五道门治理协议的实际效果。
+# Experiments — Empirical Validation
 
-## 实验总览
+> Empirical validation of the Self-Evolving Skill design pattern. Each subdirectory is a complete experiment, testing the real-world effectiveness of the Five-Gate Governance Protocol across different databases and domains.
 
-| # | 实验 | 目标领域 | 数据库规模 | Skill | 轮次 | 状态 | 关键发现 |
-|---|------|---------|-----------|-------|------|------|---------|
-| 01 | [nan-platform](01-nan-platform/) | 智能楼宇管理 | MySQL · 29表 · 590MB | db-investigator | 5 | ✅ 已完成 | 拒绝率 63.6%，增量收敛 +75→+1 |
-| 02 | [telecom-billing](02-telecom-billing/) | 电信计费（脱敏） | MySQL · 大型 | db-investigator | - | 🔧 准备中 | 跨领域可复现性验证 |
+## Experiment Overview
 
-## 每个实验的标准结构
+| # | Experiment | Target Domain | Database Scale | Skill | Rounds | Status | Key Findings |
+|---|-----------|---------------|---------------|-------|--------|--------|-------------|
+| 01 | [nan-platform](01-nan-platform/) | Smart building management (智能楼宇管理) | MySQL · 29 tables · 590 MB | db-investigator | 5 | ✅ Complete | Rejection rate 63.6%, incremental convergence +75→+1 |
+| 02 | [telecom-billing](02-telecom-billing/) | Telecom billing (desensitized) | MySQL · Large | db-investigator | - | 🔧 In progress | Cross-domain reproducibility validation |
+
+## Standard Structure per Experiment
 
 ```
 NN-experiment-name/
-├── README.md              ← 实验概述卡片（从这里开始读）
-├── 00-baseline.md         ← 零点快照：Skill 首次接触数据库时的状态
-├── 01-task-set.md         ← 实验任务集：按轮次组织的测试任务
-├── 02-evolution-log.md    ← 进化日志：每轮的五道门决策记录（核心数据）
-├── 03-quality-audit.md    ← 质量审计：拒绝率/准确性/膨胀度等维度评估
-└── snapshots/             ← 每轮结束后 references/ 的完整快照
-    ├── R0-baseline/       ← 初始模板状态
-    ├── R1-xxx/            ← Round 1 后的状态
-    └── ...                ← 可用 diff 工具对比任意两轮的变化
+├── README.md              ← Experiment overview card (start here)
+├── 00-baseline.md         ← Baseline snapshot: Skill state on first contact with the database
+├── 01-task-set.md         ← Task set: test tasks organized by round
+├── 02-evolution-log.md    ← Evolution log: Five-Gate decisions per round (core data)
+├── 03-quality-audit.md    ← Quality audit: rejection rate, accuracy, bloat, and other metrics
+└── snapshots/             ← Full snapshots of references/ after each round
+    ├── R0-baseline/       ← Initial template state
+    ├── R1-xxx/            ← State after Round 1
+    └── ...                ← Use diff tools to compare any two rounds
 ```
 
-**阅读建议**：先看实验 README 了解结论，再按 00→01→02→03 顺序深入细节。`snapshots/` 配合 diff 工具可以直观看到每轮知识的增量变化。
+**Reading guide**: Start with the experiment README for conclusions, then follow the 00→01→02→03 sequence for details. Use `snapshots/` with a diff tool to visually inspect incremental knowledge changes per round.
 
-## 如何新增实验
+## How to Add a New Experiment
 
-1. 复制 `examples/db-investigator/` 到 `.claude/skills/db-investigator/`（或对应 Skill）
-2. 配置数据库连接，执行任务集
-3. 在 `experiments/` 下创建 `NN-short-name/` 目录，按标准结构记录
-4. 更新本文件的总览表格
+1. Copy `examples/db-investigator/` to `.claude/skills/db-investigator/` (or the corresponding Skill)
+2. Configure the database connection and execute the task set
+3. Create an `NN-short-name/` directory under `experiments/`, following the standard structure
+4. Update the overview table in this file

@@ -1,73 +1,75 @@
-# Experiment #02 — 电信计费数据库（脱敏代号）
+**English** | **[中文](README.zh.md)**
 
-## 实验信息
+# Experiment #02 — Telecom Billing Database (Anonymized)
 
-| 项目 | 值 |
-|------|------|
-| 目标数据库 | [脱敏] 电信计费系统 (MySQL) |
-| 业务领域 | 电信账单 / 计费管理 |
-| 数据规模 | 大型（待确认） |
-| 使用 Skill | db-investigator |
-| 执行日期 | 2026-03-08 起 |
-| 状态 | 准备中 |
+## Experiment Details
 
-> **隐私声明**：本实验涉及生产级电信计费数据库（测试环境）。所有实验记录经过脱敏处理，表名使用语义化代号，不包含任何客户账单明细或可识别信息。实验关注的是 Skill 的进化模式，而非业务数据本身。
+| Item | Value |
+|------|-------|
+| Target Database | [Anonymized] Telecom billing system (MySQL) |
+| Business Domain | Telecom billing / charge management |
+| Data Scale | Large (TBD) |
+| Skill Used | db-investigator |
+| Start Date | 2026-03-08 |
+| Status | In progress |
 
-## 实验目的
+> **Privacy Notice**: This experiment involves a production-grade telecom billing database (test environment). All records have been desensitized — table names use semantic aliases, and no customer billing details or personally identifiable information are included. The experiment focuses on Skill evolution patterns, not the business data itself.
 
-验证 Self-Evolving Skill 设计模式的**跨领域可复现性**——在完全不同的数据库（大规模电信计费 vs 小型楼宇管理）上，五道门治理协议能否再次产生合理的知识收敛。
+## Objective
 
-## 与 Experiment #01 的关键差异
+Validate the **cross-domain reproducibility** of the Self-Evolving Skill design pattern — whether the Five-Gate Governance Protocol can again produce reasonable knowledge convergence on a fundamentally different database (large-scale telecom billing vs. small-scale smart building management).
 
-| 维度 | #01 nan-platform | #02 telecom-billing |
-|------|-----------------|-------------------|
-| 规模 | 29 表，590MB | 大型（待确认） |
-| 领域 | 智能楼宇 | 电信计费 |
-| 起点 | 完全空白 | 保留 3 条跨库工具经验 |
-| 记录方式 | 全量公开 | 脱敏后公开 |
+## Key Differences from Experiment #01
 
-## 实验前决策记录
+| Dimension | #01 nan-platform | #02 telecom-billing |
+|-----------|-----------------|---------------------|
+| Scale | 29 tables, 590 MB | Large (TBD) |
+| Domain | Smart building management (智能楼宇) | Telecom billing |
+| Starting point | Completely blank | 3 cross-database tool tips retained |
+| Record policy | Fully public | Anonymized before publishing |
 
-### 决策 1：references/ 清空策略
+## Pre-Experiment Decision Log
 
-**结论**：清空领域知识，保留工具经验
+### Decision 1: references/ Reset Strategy
 
-| 类别 | 处理 | 理由 |
-|------|------|------|
-| schema_map.md | 恢复模板 | nan_platform 表关系对新库无意义 |
-| business_rules.md | 恢复模板 | 字典枚举、status 约定等均为 nan_platform 特有 |
-| query_patterns.md | 清空 SQL 模板，**保留 3 条 Tool Usage Notes** | 工具经验跨库通用（shell 转义、中文传参、数据空窗期） |
-| investigation_flows.md | 恢复模板 | 调查流程绑定 nan_platform 具体表 |
-| _index.md | 恢复为通用路由模板 | 摘要需匹配新的文件内容 |
+**Conclusion**: Clear domain knowledge, retain tool experience
 
-**保留的工具经验**：
-1. `!=` 需替换为 `<>` — db_query.py 的 shell 传参限制
-2. 先查数据时间范围 — 避免数据空窗期导致误判
-3. SQL 中避免中文字符串 — shell 传参编码问题
+| Category | Action | Rationale |
+|----------|--------|-----------|
+| schema_map.md | Reset to template | nan_platform table relationships are irrelevant to the new database |
+| business_rules.md | Reset to template | Dictionary enums, status conventions, etc. are nan_platform-specific |
+| query_patterns.md | Clear SQL templates, **retain 3 Tool Usage Notes** | Tool experience is database-agnostic (shell escaping, Chinese parameter passing, data gap periods) |
+| investigation_flows.md | Reset to template | Investigation flows are tied to specific nan_platform tables |
+| _index.md | Reset to generic routing template | Summary must match the new file contents |
 
-**选择理由**：这 3 条是工具层面的经验，与领域无关。保留它们同时测试了"跨库知识迁移"这一额外维度。
+**Retained tool tips**:
+1. `!=` must be replaced with `<>` — shell parameter-passing limitation of db_query.py
+2. Always check the data time range first — avoid misdiagnosis caused by data gap periods
+3. Avoid Chinese strings in SQL — shell parameter-passing encoding issues
 
-### 决策 2：五道门协议微调
+**Rationale**: These 3 tips are tool-level experience, independent of domain. Retaining them also tests an additional dimension: cross-database knowledge transfer.
 
-基于 Experiment #01 的观察，在实验 #02 开始前对 SKILL.md 做了两处微调：
+### Decision 2: Five-Gate Protocol Adjustments
 
-1. **Gate 5 扩展**：_index.md 更新触发条件从"新建文件时"扩展为"新建或已有文件范围显著变化时"
-2. **Scaling Rules 主动检查**：新增 Active check——每次写入后验证目标文件行数
+Based on observations from Experiment #01, two minor adjustments were made to SKILL.md before starting Experiment #02:
 
-### 决策 3：脱敏策略
+1. **Gate 5 expansion**: The _index.md update trigger was broadened from "when a new file is created" to "when a new file is created or an existing file's scope changes significantly"
+2. **Scaling Rules active check**: Added an active check — verify the target file's line count after each write
 
-- 表名使用语义化代号（如 `[billing-T1]`）或脱敏后的通用名（如 `t_bill_detail`）
-- 字段名保留语义但去掉业务细节
-- SQL 模板保留结构，替换具体名称
-- 被拒绝的知识只记录 Gate 编号和拒绝类别，不记录具体内容
-- 所有数值使用模糊描述（"数万行"而非精确行数）
+### Decision 3: Anonymization Strategy
 
-## 文件导航
+- Table names use semantic aliases (e.g., `[billing-T1]`) or anonymized generic names (e.g., `t_bill_detail`)
+- Field names retain semantics but omit business specifics
+- SQL templates preserve structure with substituted names
+- Rejected knowledge entries record only the Gate number and rejection category, not the specific content
+- All numeric values use approximate descriptions ("tens of thousands of rows" rather than exact counts)
 
-| 文件 | 内容 | 状态 |
-|------|------|------|
-| `00-baseline.md` | 数据库基线快照（脱敏） | 待创建 |
-| `01-task-set.md` | 实验任务集 | 待创建 |
-| `02-evolution-log.md` | 进化日志（脱敏） | 待创建 |
-| `03-quality-audit.md` | 质量审计 | 待创建 |
-| `snapshots/` | 每轮知识快照（脱敏） | 待创建 |
+## File Navigation
+
+| File | Content | Status |
+|------|---------|--------|
+| `00-baseline.md` | Database baseline snapshot (anonymized) | To be created |
+| `01-task-set.md` | Experiment task set | To be created |
+| `02-evolution-log.md` | Evolution log (anonymized) | To be created |
+| `03-quality-audit.md` | Quality audit | To be created |
+| `snapshots/` | Per-round knowledge snapshots (anonymized) | To be created |
