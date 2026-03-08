@@ -285,6 +285,13 @@ A Self-Evolving Skill for MySQL database investigation, demonstrating:
 
 > The references/ files contain template examples. In real use, the AI populates them with actual domain knowledge through the Five-Gate protocol during real interactions.
 
+> [!TIP]
+> **Tool layer is swappable.** The reference implementation uses Python scripts (`db_query.py`, `fetch_structure.py`, `fetch_index.py`) to interact with MySQL. This is a deliberate choice for portability — anyone can `pip install pymysql` and start using it, with built-in read-only enforcement and output formatting.
+>
+> However, the Self-Evolving Skill pattern is **tool-layer agnostic**. If you prefer [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) — e.g., a MySQL MCP Server — you can replace the Python scripts entirely. Just update `allowed-tools` in SKILL.md to point to your MCP tools instead. The core of the pattern (Five-Gate governance, references/ knowledge system, selective injection) is completely independent of how queries reach the database.
+>
+> Choose what fits your setup: Python scripts for simplicity and portability, MCP for native Claude Code integration.
+
 ---
 
 ## Empirical Validation

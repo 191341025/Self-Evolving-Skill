@@ -321,6 +321,13 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 
 > references/ 中的内容为模板示例。实际使用时，AI 会在真实交互中通过五道门协议逐步填充真实的领域知识。
 
+> [!TIP]
+> **工具层可替换。** 参考实现使用 Python 脚本（`db_query.py`、`fetch_structure.py`、`fetch_index.py`）与 MySQL 交互。这是为了可移植性——`pip install pymysql` 即可使用，且内置只读校验和输出格式化。
+>
+> 但 Self-Evolving Skill 设计模式本身**与工具层无关**。如果你更倾向使用 [MCP（Model Context Protocol）](https://modelcontextprotocol.io/)——例如 MySQL MCP Server——可以完全替换 Python 脚本，只需将 SKILL.md 中的 `allowed-tools` 指向 MCP 工具即可。模式的核心（五道门治理、references/ 知识体系、选择性注入）完全独立于数据库的访问方式。
+>
+> 按你的环境选择：Python 脚本追求简单可移植，MCP 追求 Claude Code 原生集成。
+
 ## 13. 实证验证
 
 我们在真实数据库上进行了完整的进化实验，验证设计模式的实际效果。
