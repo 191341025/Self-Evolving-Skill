@@ -9,6 +9,7 @@
 | # | Experiment | Target Domain | Database Scale | Skill | Rounds | Status | Key Findings |
 |---|-----------|---------------|---------------|-------|--------|--------|-------------|
 | 01 | [nan-platform](01-nan-platform/) | Smart building management (智能楼宇管理) | MySQL · 29 tables · 590 MB | db-investigator | 5 | ✅ Complete | Rejection rate 63.6%, incremental convergence +75→+1 |
+| 01-v2 | [nan-platform-v2](01-nan-platform-v2/) | Same as #01, Gate 4 upgrade | MySQL · 29 tables · 590 MB | db-investigator | 5 | ✅ Complete | Decay model validation, acceptance rate 24%, R5 4/4 first-try |
 | 02 | [telecom-billing](02-telecom-billing/) | Telecom billing (desensitized) | MySQL · Large | db-investigator | - | 🔧 In progress | Cross-domain reproducibility validation |
 
 ## Standard Structure per Experiment

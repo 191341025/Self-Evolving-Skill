@@ -56,9 +56,19 @@ Gate 3 — REDUNDANCY: Already captured (possibly different wording)?
   Yes → MERGE into existing or skip
   No → proceed
 
-Gate 4 — FRESHNESS: Time-sensitive data?
-  Yes → Mark with (YYYY-MM-DD), subject to staleness review
-  No → Add as stable fact
+Gate 4 — FRESHNESS (write): Assign decay metadata
+  → Classify knowledge type:
+    schema (λ=0.003, t½≈231d) | business_rule (λ=0.008, t½≈87d)
+    tool_experience (λ=0.005, t½≈139d) | query_pattern (λ=0.015, t½≈46d)
+    data_range (λ=0.035, t½≈20d) | data_snapshot (λ=0.050, t½≈14d)
+  → Write format: <!-- decay: type=<type> confirmed=<YYYY-MM-DD> C0=1.0 -->
+  → High-decay types (data_range/data_snapshot, λ≥0.035): prefer rejection
+
+Gate 4 — FRESHNESS (read): Confidence-based response
+  → Compute C(t) = e^(-λ × t), where t = days since confirmed
+  → C ≥ 0.8  → TRUST: use directly, no mention of confidence
+  → 0.5 ≤ C < 0.8 → VERIFY: use but flag for opportunistic verification
+  → C < 0.5  → REVALIDATE: verify with tools BEFORE using
 
 Gate 5 — PLACEMENT: Which topic file? Which memory tier?
   Structure knowledge → schema_map.md
@@ -66,7 +76,7 @@ Gate 5 — PLACEMENT: Which topic file? Which memory tier?
   Reusable SQL → query_patterns.md
   Multi-step investigation procedure → investigation_flows.md
   New topic needed → only if 3+ related facts justify a new file
-  Update _index.md if new file created
+  Update _index.md if new file created OR existing file's scope changed significantly
 ```
 
 **Default outcome is NO CHANGE.** Most interactions do not produce knowledge worth persisting. The gates' primary job is to reject, not to accept.
@@ -76,6 +86,27 @@ Gate 5 — PLACEMENT: Which topic file? Which memory tier?
 - Single topic file exceeds ~80 lines → split into sub-topics
 - Total topic files exceed 8 → review for consolidation
 - `_index.md` must stay under 40 lines (pure routing, no detail)
+- **Active check**: After each knowledge write, verify the target file's line count; if approaching 80, plan the split before next write
+
+### Confidence Decay Model
+
+Every knowledge entry carries a decay tag: `<!-- decay: type=<type> confirmed=<date> C0=1.0 -->`
+
+**Formula**: `C(t) = C0 × e^(-λ × t)` where t = days since `confirmed`
+
+| type | λ | Half-life | Examples |
+|------|---|-----------|---------|
+| `schema` | 0.003 | ~231 days | Table relationships, JOIN paths |
+| `business_rule` | 0.008 | ~87 days | Status conventions, enums |
+| `tool_experience` | 0.005 | ~139 days | Shell pitfalls, parameter tips |
+| `query_pattern` | 0.015 | ~46 days | SQL templates |
+| `data_range` | 0.035 | ~20 days | MIN/MAX timestamps |
+| `data_snapshot` | 0.050 | ~14 days | Row counts, distributions |
+
+**Boundary rules**:
+- Never auto-delete entries even if C→0; deletion requires user confirmation
+- Confidence resets to 1.0 only after tool-verified revalidation, not assumptions
+- If REVALIDATE finds contradiction → Gate 2 (ALIGNMENT) takes priority over decay repair
 
 ## Commands
 
