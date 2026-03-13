@@ -36,12 +36,15 @@
 skill-name/
 ├── SKILL.md                        # 触发条件 + 治理协议
 ├── scripts/                        # 执行工具
+│   ├── core/                       # 计算层（衰减模型）
+│   │   ├── formulas.py             # 原子公式
+│   │   ├── models.py               # 组合模型 + 配置
+│   │   └── parser.py               # 衰减标签解析器
+│   ├── decay_engine.py             # 置信度扫描 / 反馈 / 重置 CLI
+│   └── *.py                        # 领域专用工具
 └── references/                     # 活的知识库（AI 维护）
     ├── _index.md                   # 路由表（<40行）
-    ├── schema_map.md               # 结构知识
-    ├── query_patterns.md           # 可复用查询模板
-    ├── business_rules.md           # 已确认的业务规则
-    └── investigation_flows.md      # 多步调查工作流
+    └── <topic>.md                  # 带衰减标签的主题文件
 ```
 
 ---
@@ -118,12 +121,34 @@ skill-name/
 │   ├── business_rules.md     业务规则
 │   └── investigation_flows.md 调查工作流（可复用的多步调查流程）
 │
-├── scripts/ (第三级 -- 执行工具)
-│   └── *.py
+├── scripts/ (第三级 -- 执行工具 + 计算层)
+│   ├── core/                   计算内核（衰减公式、模型、标签解析）
+│   ├── decay_engine.py         置信度引擎 CLI（scan / feedback / reset）
+│   └── *.py                    领域专用工具（数据查询、结构获取等）
 │
 └── db_schemas/ (第三级 -- 缓存)
     └── ...
 ```
+
+### 计算层：LLM 做判断，Python 做计算
+
+置信度衰减模型的计算（指数衰减、贝叶斯反馈调整、阈值分类）对 LLM 在 prompt 中"心算"来说过于复杂。本模式将职责分离：
+
+- **SKILL.md（Prompt 层）：** 定义"何时调用工具"和"如何响应结果"
+- **Python 工具层（计算层）：** 执行所有数学计算，返回明确结论
+- **LLM 不需要知道公式细节** — 运行工具，按输出行动
+
+```
+第三级架构:
+scripts/
+├── core/
+│   ├── formulas.py     ← 原子公式（指数衰减、贝叶斯因子）
+│   ├── models.py       ← 组合模型（置信度计算、分级分类）
+│   └── parser.py       ← 衰减标签 I/O（读写 markdown 标签）
+└── decay_engine.py     ← CLI 入口（scan / feedback / reset）
+```
+
+公式在 Python 中可测试、可组合、可扩展，SKILL.md 保持精简。
 
 ### 三级加载机制
 
@@ -180,10 +205,24 @@ Gate 3 -- REDUNDANCY（冗余）
   → 存在 → 合并到已有条目，或跳过
   → 不存在 → 通过
 
-Gate 4 -- FRESHNESS（时效）
-  问: 是时间敏感的数据吗？
-  → 是 → 标注日期 (YYYY-MM-DD)，后续会话可识别并清理过时数据
-  → 否 → 作为稳定事实入库
+Gate 4 -- FRESHNESS（时效 / 写入）
+  对知识分类并附加衰减元数据：
+  → <!-- decay: type=<type> confirmed=<YYYY-MM-DD> C0=1.0 -->
+  → 六种类型：schema | business_rule | tool_experience | query_pattern | data_range | data_snapshot
+  → 高衰减类型（data_range, data_snapshot）：倾向于拒绝入库
+
+Gate 4 -- FRESHNESS（时效 / 读取）
+  使用知识前运行置信度扫描：
+  → 工具根据时间和反馈历史计算 C(t)
+  → TRUST (C≥0.8)：直接使用
+  → VERIFY (0.5≤C<0.8)：使用但标记待验证
+  → REVALIDATE (C<0.5)：先用工具验证再使用
+
+Gate 4 -- FRESHNESS（时效 / 反馈）
+  使用知识完成操作后：
+  → 成功 → 记录正向反馈（减缓衰减）
+  → 失败 → 记录负向反馈（加速衰减）
+  → 重新验证通过后 → 重置为全新状态
 
 Gate 5 -- PLACEMENT（归位）
   问: 放哪个主题文件？放哪个记忆层次？
@@ -198,7 +237,7 @@ Gate 5 -- PLACEMENT（归位）
 | 新增知识 | 通过五道门后入库 |
 | 纠错 | Gate 2 发现矛盾时，修正已有条目 |
 | 去重 | Gate 3 检测冗余，合并而非追加 |
-| 过期清理 | Gate 4 标注日期，后续识别陈旧数据 |
+| 过期清理 | Gate 4 置信度衰减模型，工具计算时效性 + 贝叶斯反馈调节 |
 | 结构维护 | Gate 5 + 扩展规则，控制文件粒度 |
 | 不变 | 五道门全部"否" → 不做任何修改（这是最常见的结果） |
 
@@ -275,7 +314,7 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 |------|------|------|
 | 知识污染 | 错误的规则被写入，导致后续会话产生错误判断 | Gate 2（ALIGNMENT）+ 用户确认关键业务规则 |
 | 信息膨胀 | 大量低价值知识堆积，淹没真正重要的规则 | Gate 1（VALUE）+ Gate 3（REDUNDANCY）+ 扩展规则 |
-| 过时未清理 | 旧版本的表结构、已废弃的 SP 仍在知识库中 | Gate 4（FRESHNESS）+ 日期标注 + 业务变更时主动审查 |
+| 过时未清理 | 旧版本的表结构、已废弃的 SP 仍在知识库中 | Gate 4（FRESHNESS）+ 置信度衰减 + 业务变更时主动审查 |
 | 指令混乱 | SKILL.md 的指令与 references/ 的知识互相矛盾 | SKILL.md 极少变化，references/ 通过路由隔离 |
 
 **最根本的防护**：Skill 的进化完全在 AI 的上下文层面发生，不修改模型参数，不修改系统架构。即使知识库出现问题，最坏情况是"给了一条错误的参考信息"，而不是"模型行为不可逆地改变了"。这是 Skill 级别自演化相比模型级别自演化的天然安全优势。
@@ -307,24 +346,22 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 
 ## 12. 参考实现
 
-本仓库包含一个完整的参考实现：[`examples/db-investigator/`](examples/db-investigator/)
+本仓库包含一个完整的参考实现，位于 Claude Code 技能路径下：`.claude/skills/db-investigator/`
 
 这是一个面向 MySQL 数据库调查的 Self-Evolving Skill，展示了：
 
-| 组件 | 文件 | 说明 |
+| 组件 | 路径 | 说明 |
 |------|------|------|
-| Skill 定义 | [`SKILL.md`](examples/db-investigator/SKILL.md) | frontmatter（触发条件）+ body（工具选择、五道门协议、扩展规则） |
-| 知识路由 | [`references/_index.md`](examples/db-investigator/references/_index.md) | 路由表示例 |
-| 领域知识 | [`references/*.md`](examples/db-investigator/references/) | 四层记忆模型的文件示例（含模板占位内容） |
-| 执行工具 | [`scripts/`](examples/db-investigator/scripts/) | 三个只读工具：数据查询、结构获取、元数据索引 |
-| 结构缓存 | [`db_schemas/`](examples/db-investigator/db_schemas/) | 工具输出的离线缓存目录 |
-
-> references/ 中的内容为模板示例。实际使用时，AI 会在真实交互中通过五道门协议逐步填充真实的领域知识。
+| Skill 定义 | `SKILL.md` | frontmatter（触发条件）+ body（工具选择、五道门协议、扩展规则） |
+| 计算层 | `scripts/core/` | 置信度衰减公式、组合模型、标签解析器 |
+| 衰减引擎 | `scripts/decay_engine.py` | scan / feedback / reset CLI |
+| 执行工具 | `scripts/` | 三个只读工具：数据查询、结构获取、元数据索引 |
+| 知识路由 | `references/_index.md` | 路由表 |
+| 领域知识 | `references/*.md` | 带衰减元数据标签的活知识条目 |
+| 结构缓存 | `db_schemas/` | 工具输出的离线缓存目录 |
 
 > [!TIP]
-> **工具层可替换。** 参考实现使用 Python 脚本（`db_query.py`、`fetch_structure.py`、`fetch_index.py`）与 MySQL 交互。这是为了可移植性——`pip install pymysql` 即可使用，且内置只读校验和输出格式化。
->
-> 但 Self-Evolving Skill 设计模式本身**与工具层无关**。如果你更倾向使用 [MCP（Model Context Protocol）](https://modelcontextprotocol.io/)——例如 MySQL MCP Server——可以完全替换 Python 脚本，只需将 SKILL.md 中的 `allowed-tools` 指向 MCP 工具即可。模式的核心（五道门治理、references/ 知识体系、选择性注入）完全独立于数据库的访问方式。
+> **工具层可替换。** Self-Evolving Skill 设计模式本身**与工具层无关**。参考实现使用 Python 脚本与 MySQL 交互，但如果你更倾向使用 [MCP（Model Context Protocol）](https://modelcontextprotocol.io/)，可以完全替换 Python 脚本，只需将 SKILL.md 中的 `allowed-tools` 指向 MCP 工具即可。模式的核心（五道门治理、references/ 知识体系、选择性注入、置信度衰减模型）完全独立于数据库的访问方式。
 >
 > 按你的环境选择：Python 脚本追求简单可移植，MCP 追求 Claude Code 原生集成。
 
@@ -336,7 +373,8 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 
 | 实验 | 领域 | 轮次 | 核心结论 |
 |------|------|------|---------|
-| [#01 nan-platform](experiments/01-nan-platform/) | 智能楼宇管理 (29表) | 5轮 | 拒绝率 63.6%，增量 +75→+1 收敛，Gate 2 自我纠错 2 次 |
+| [#01 nan-platform v1](experiments/01-nan-platform/) | 智能楼宇管理 (29表) | 5轮 | 拒绝率 63.6%，增量 +75→+1 收敛，Gate 2 自我纠错 2 次 |
+| [#01 nan-platform v2](experiments/01-nan-platform-v2/) | 同领域，Gate 4 验证 | 5轮 | 置信度衰减模型验证通过，25/25 任务完成，贝叶斯反馈机制验证 |
 
 每个实验包含完整的进化日志、五道门决策记录、质量审计报告和每轮知识快照，可逐步 diff 观察 Skill 的知识增长过程。
 
@@ -353,12 +391,13 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
    skill-name/
    ├── SKILL.md
    ├── scripts/
+   │   └── core/            计算层（衰减公式、模型、标签解析）
    └── references/
        └── _index.md
 
 3. 编写 SKILL.md
    - frontmatter: 触发条件 + 行为准则
-   - body: 工具选择 + 知识治理协议 + 扩展规则
+   - body: 工具选择 + 知识治理协议（含 Gate 4 工具计算指令）+ 扩展规则
 
 4. 初始化 references/
    - _index.md: 空路由表

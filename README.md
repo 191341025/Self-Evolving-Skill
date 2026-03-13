@@ -38,12 +38,15 @@ If both answers are yes, this pattern fits.
 skill-name/
 ├── SKILL.md                        # Trigger conditions + governance protocol
 ├── scripts/                        # Execution tools
+│   ├── core/                       # Computation layer (decay model)
+│   │   ├── formulas.py             # Atomic formulas
+│   │   ├── models.py               # Composite models + config
+│   │   └── parser.py               # Decay tag parser
+│   ├── decay_engine.py             # Confidence scan / feedback / reset CLI
+│   └── *.py                        # Domain-specific tools
 └── references/                     # Living knowledge base (AI-maintained)
     ├── _index.md                   # Routing table (<40 lines)
-    ├── schema_map.md               # Structural knowledge
-    ├── query_patterns.md           # Reusable query templates
-    ├── business_rules.md           # Confirmed business logic
-    └── investigation_flows.md      # Multi-step reusable workflows
+    └── <topic>.md                  # Topic files with decay-tagged entries
 ```
 
 ---
@@ -68,10 +71,24 @@ Gate 3 — REDUNDANCY
   → Exists → MERGE into existing entry, or skip
   → Doesn't exist → PASS
 
-Gate 4 — FRESHNESS
-  Q: Is this time-sensitive data?
-  → Yes → Tag with date (YYYY-MM-DD); future sessions can identify and clean stale data
-  → No → Store as stable fact → PASS
+Gate 4 — FRESHNESS (write)
+  Classify knowledge type and attach decay metadata:
+  → <!-- decay: type=<type> confirmed=<YYYY-MM-DD> C0=1.0 -->
+  → Six types: schema | business_rule | tool_experience | query_pattern | data_range | data_snapshot
+  → High-decay types (data_range, data_snapshot): prefer rejection
+
+Gate 4 — FRESHNESS (read)
+  Run confidence scan before using knowledge:
+  → Tool computes C(t) based on time elapsed and feedback history
+  → TRUST (C>=0.8): use directly
+  → VERIFY (0.5<=C<0.8): use but flag for verification
+  → REVALIDATE (C<0.5): verify with tools first
+
+Gate 4 — FRESHNESS (feedback)
+  After operations that used knowledge:
+  → Success → record positive feedback (slows future decay)
+  → Failure → record negative feedback (accelerates decay)
+  → After revalidation passes → reset to fresh state
 
 Gate 5 — PLACEMENT
   Q: Which file does this belong in? Which memory layer?
@@ -88,7 +105,7 @@ Gate 5 — PLACEMENT
 | Add knowledge | Must pass all five gates |
 | Correct errors | Gate 2 detects contradictions; fix in place |
 | Deduplicate | Gate 3 merges rather than appends |
-| Expire stale data | Gate 4 date-tags; sessions identify and clean outdated entries |
+| Expire stale data | Gate 4 confidence decay model; tool-computed freshness with Bayesian feedback |
 | Maintain structure | Gate 5 + scaling rules control file granularity |
 
 ---
@@ -105,6 +122,26 @@ Gate 5 — PLACEMENT
 | Level 3: scripts/ | Claude invokes on demand | Execution tools | Extend as needed |
 
 **The key distinction:** A traditional Skill's Level 3 is static reference documentation. A Self-Evolving Skill's Level 3 is a living knowledge base, maintained by the AI under the governance protocol.
+
+### Computation Layer: LLM Judges, Python Computes
+
+The confidence decay model's calculations (exponential decay, Bayesian feedback adjustment, threshold classification) are too complex for LLM "mental math" in prompts. The pattern separates concerns:
+
+- **SKILL.md (Prompt layer):** Defines *when* to call tools and *how* to respond to results
+- **Python tools (Computation layer):** Executes all math, returns clear conclusions
+- **LLM does not need to know the formulas** — it runs the tool and acts on the output
+
+```
+Layer 3 architecture:
+scripts/
+├── core/
+│   ├── formulas.py     <- Atomic formulas (exponential decay, Bayesian factor)
+│   ├── models.py       <- Composite models (confidence calculation, classification)
+│   └── parser.py       <- Decay tag I/O (read/write markdown tags)
+└── decay_engine.py     <- CLI entry point (scan / feedback / reset)
+```
+
+This separation means formulas can grow in complexity without bloating SKILL.md, and every formula is unit-testable.
 
 ### Selective Injection via Routing Table
 
@@ -208,7 +245,7 @@ The survey literature introduces *Misevolution* — quality degradation during s
 |------|---------------|------------|
 | Knowledge pollution | Incorrect rules written in, causing downstream errors | Gate 2 (ALIGNMENT) + user confirmation for critical business rules |
 | Information bloat | Low-value knowledge accumulates, burying important rules | Gate 1 (VALUE) + Gate 3 (REDUNDANCY) + scaling rules |
-| Stale data | Deprecated table structures or SPs remain in knowledge base | Gate 4 (FRESHNESS) + date tagging + proactive review on business changes |
+| Stale data | Deprecated table structures or SPs remain in knowledge base | Gate 4 (FRESHNESS) + confidence decay model + feedback-driven revalidation |
 | Instruction conflict | SKILL.md instructions contradict references/ knowledge | SKILL.md changes rarely; references/ isolated via routing |
 
 **The fundamental safety advantage:** A Self-Evolving Skill operates entirely at the context layer. It does not modify model parameters or system architecture. Even if the knowledge base develops an error, the worst case is "one bad reference fact" — not "irreversible behavioral change in the model." This is a natural safety advantage over model-level self-evolution.
@@ -271,24 +308,22 @@ Business change triggers: new systems, schema refactors → partial return to Gr
 
 ## Reference Implementation
 
-This repository includes a complete reference implementation: [`examples/db-investigator/`](examples/db-investigator/)
+This repository includes a complete reference implementation under the Claude Code skill path: `.claude/skills/db-investigator/`
 
 A Self-Evolving Skill for MySQL database investigation, demonstrating:
 
-| Component | File | Description |
+| Component | Path | Description |
 |-----------|------|-------------|
-| Skill definition | [`SKILL.md`](examples/db-investigator/SKILL.md) | frontmatter (triggers) + body (tool selection, Five-Gate protocol, scaling rules) |
-| Knowledge routing | [`references/_index.md`](examples/db-investigator/references/_index.md) | Routing table example |
-| Domain knowledge | [`references/*.md`](examples/db-investigator/references/) | Four-layer memory model file examples (with template placeholders) |
-| Execution tools | [`scripts/`](examples/db-investigator/scripts/) | Three read-only tools: data query, structure fetch, metadata index |
-| Structure cache | [`db_schemas/`](examples/db-investigator/db_schemas/) | Offline cache directory for tool outputs |
-
-> The references/ files contain template examples. In real use, the AI populates them with actual domain knowledge through the Five-Gate protocol during real interactions.
+| Skill definition | `SKILL.md` | frontmatter (triggers) + body (tool selection, Five-Gate protocol, scaling rules) |
+| Computation layer | `scripts/core/` | Confidence decay formulas, models, and tag parser |
+| Decay engine | `scripts/decay_engine.py` | CLI for scan / feedback / reset operations |
+| Execution tools | `scripts/` | Read-only tools: data query, structure fetch, metadata index |
+| Knowledge routing | `references/_index.md` | Routing table |
+| Domain knowledge | `references/*.md` | Living knowledge entries with decay metadata tags |
+| Structure cache | `db_schemas/` | Offline cache for fetched structures |
 
 > [!TIP]
-> **Tool layer is swappable.** The reference implementation uses Python scripts (`db_query.py`, `fetch_structure.py`, `fetch_index.py`) to interact with MySQL. This is a deliberate choice for portability — anyone can `pip install pymysql` and start using it, with built-in read-only enforcement and output formatting.
->
-> However, the Self-Evolving Skill pattern is **tool-layer agnostic**. If you prefer [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) — e.g., a MySQL MCP Server — you can replace the Python scripts entirely. Just update `allowed-tools` in SKILL.md to point to your MCP tools instead. The core of the pattern (Five-Gate governance, references/ knowledge system, selective injection) is completely independent of how queries reach the database.
+> **Tool layer is swappable.** The Self-Evolving Skill pattern is **tool-layer agnostic**. If you prefer [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) — e.g., a MySQL MCP Server — you can replace the Python scripts entirely. Just update `allowed-tools` in SKILL.md to point to your MCP tools instead. The core of the pattern (Five-Gate governance, references/ knowledge system, selective injection) is completely independent of how queries reach the database.
 >
 > Choose what fits your setup: Python scripts for simplicity and portability, MCP for native Claude Code integration.
 
@@ -302,7 +337,8 @@ We ran full evolution experiments on real databases to validate the design patte
 
 | Experiment | Domain | Rounds | Key Findings |
 |-----------|--------|--------|-------------|
-| [#01 nan-platform](experiments/01-nan-platform/) | Smart Building Mgmt (29 tables) | 5 | 63.6% rejection rate, increments converge +75→+1, 2 Gate 2 self-corrections |
+| [#01 nan-platform v1](experiments/01-nan-platform/) | Smart Building Mgmt (29 tables) | 5 | 63.6% rejection rate, increments converge +75→+1, 2 Gate 2 self-corrections |
+| [#01 nan-platform v2](experiments/01-nan-platform-v2/) | Same domain, Gate 4 validation | 5 | Confidence decay model verified, 25/25 tasks completed, Bayesian feedback validated |
 
 Each experiment includes full evolution logs, Five-Gate decision records, quality audits, and per-round knowledge snapshots — you can diff any two rounds to observe exactly how the Skill's knowledge grew.
 
@@ -319,12 +355,14 @@ Each experiment includes full evolution logs, Five-Gate decision records, qualit
    skill-name/
    ├── SKILL.md
    ├── scripts/
+   │   └── core/              # Computation layer (decay model)
    └── references/
        └── _index.md
 
 3. Write SKILL.md
    - frontmatter: trigger conditions + behavioral guidelines
    - body: tool selection + Five-Gate governance protocol + scaling rules
+   - Gate 4 freshness: delegate confidence math to scripts/core/ tools, not inline formulas
 
 4. Initialize references/
    - _index.md: empty routing table
