@@ -10,6 +10,6 @@
 <!-- entities: db_query -->
 - In db_query.py SQL passed via shell: use <> instead of != for not-equal comparisons, as != gets escaped by bash.
 
-<!-- decay: type=query_pattern confirmed=2026-03-14 C0=1.0 alpha=1 beta=0 -->
+<!-- decay: type=query_pattern confirmed=2026-03-14 C0=1.0 -->
 <!-- entities: t_building, t_room, t_employee_settle -->
 - Occupancy rate query: use subqueries to avoid cross-join when aggregating from multiple child tables to same parent. Pattern: SELECT b.*, COALESCE(rc.x,0), COALESCE(sc.y,0) FROM t_building b LEFT JOIN (SELECT building_id, agg FROM child1 GROUP BY building_id) rc ON ... LEFT JOIN (SELECT building_id, agg FROM child2 GROUP BY building_id) sc ON ...
