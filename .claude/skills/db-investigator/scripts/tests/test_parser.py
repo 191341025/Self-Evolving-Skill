@@ -11,6 +11,7 @@ from core.parser import (
     update_decay_tag,
     increment_feedback,
     reset_entry,
+    append_entry,
 )
 
 
@@ -221,7 +222,7 @@ class TestUpdateDecayTag:
     def test_no_tag_at_line(self, tmp_path):
         """Line without decay tag raises ValueError."""
         tag = "<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 -->"
-        f, lineno = _make_tag_file(tmp_path, tag)
+        f, _lineno = _make_tag_file(tmp_path, tag)
         # Line 1 is "# Section heading", not a tag
         with pytest.raises(ValueError, match="No decay tag"):
             update_decay_tag(str(f), 1, {"alpha": 1})
@@ -328,3 +329,113 @@ class TestResetEntry:
         assert result["type"] == "data_snapshot"
         content = f.read_text(encoding="utf-8")
         assert "type=data_snapshot" in content
+
+
+# ---------- append_entry ----------
+
+class TestAppendEntry:
+    """Tests for append_entry."""
+
+    def test_append_entry_basic(self, sample_md_file):
+        """Append to an existing file: correct tag, content, line number, parseable."""
+        lineno = append_entry(
+            str(sample_md_file), "schema", "New column added to users table"
+        )
+        content = sample_md_file.read_text(encoding="utf-8")
+        today = date.today().isoformat()
+
+        # Decay tag and content line present
+        assert f"<!-- decay: type=schema confirmed={today} C0=1.0 -->" in content
+        assert "- New column added to users table" in content
+
+        # Line number is correct
+        lines = content.splitlines()
+        assert lines[lineno - 1].strip().startswith("<!-- decay:")
+
+        # Tag is parseable
+        parsed = parse_decay_tag(lines[lineno - 1])
+        assert parsed is not None
+        assert parsed["type"] == "schema"
+        assert parsed["confirmed"] == today
+        assert parsed["C0"] == 1.0
+
+    def test_append_entry_creates_file(self, tmp_path):
+        """Non-existent file is created with template, entry appended."""
+        target = tmp_path / "business_rules.md"
+        assert not target.exists()
+
+        lineno = append_entry(str(target), "business_rule", "Status 1 means active")
+
+        assert target.exists()
+        content = target.read_text(encoding="utf-8")
+
+        # Template header present
+        assert content.startswith("# Business rules")
+        assert "通过五道门治理协议管理" in content
+
+        # Entry appended correctly
+        today = date.today().isoformat()
+        assert f"<!-- decay: type=business_rule confirmed={today} C0=1.0 -->" in content
+        assert "- Status 1 means active" in content
+
+        # Line number valid
+        lines = content.splitlines()
+        assert lines[lineno - 1].strip().startswith("<!-- decay:")
+
+    def test_append_entry_invalid_type(self, tmp_path):
+        """Invalid knowledge_type raises ValueError."""
+        target = tmp_path / "test.md"
+        target.write_text("# Test\n", encoding="utf-8")
+        with pytest.raises(ValueError):
+            append_entry(str(target), "invalid_type", "some content")
+
+    def test_append_entry_multiple(self, tmp_path):
+        """Two successive appends: both present, line numbers increment, blank-line separation."""
+        target = tmp_path / "multi.md"
+        target.write_text("# Multi\n\nSome intro text.\n", encoding="utf-8")
+
+        lineno1 = append_entry(str(target), "schema", "First entry")
+        lineno2 = append_entry(str(target), "business_rule", "Second entry")
+
+        assert lineno2 > lineno1
+
+        content = target.read_text(encoding="utf-8")
+        lines = content.splitlines()
+
+        # Both tags present and parseable
+        parsed1 = parse_decay_tag(lines[lineno1 - 1])
+        parsed2 = parse_decay_tag(lines[lineno2 - 1])
+        assert parsed1 is not None
+        assert parsed2 is not None
+        assert parsed1["type"] == "schema"
+        assert parsed2["type"] == "business_rule"
+
+        # Content lines follow their tags
+        assert lines[lineno1].strip() == "- First entry"
+        assert lines[lineno2].strip() == "- Second entry"
+
+        # Blank line separation: line before tag should be empty
+        assert lines[lineno1 - 2].strip() == ""
+        assert lines[lineno2 - 2].strip() == ""
+
+    def test_append_entry_no_trailing_newline(self, tmp_path):
+        """File without trailing newline still gets correct formatting."""
+        target = tmp_path / "no_newline.md"
+        # Write without trailing newline
+        target.write_text("# No trailing newline\n\nSome content here.", encoding="utf-8")
+
+        lineno = append_entry(str(target), "query_pattern", "SELECT * FROM users")
+
+        content = target.read_text(encoding="utf-8")
+        lines = content.splitlines()
+
+        # Tag is at the correct line and parseable
+        parsed = parse_decay_tag(lines[lineno - 1])
+        assert parsed is not None
+        assert parsed["type"] == "query_pattern"
+
+        # Content line follows tag
+        assert lines[lineno].strip() == "- SELECT * FROM users"
+
+        # Blank line separates old content from new entry
+        assert lines[lineno - 2].strip() == ""

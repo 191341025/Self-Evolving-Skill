@@ -1,7 +1,7 @@
 # 计算层架构设计：从 Prompt 到 Tool
 
 > Self-Evolving Skill 设计文档
-> 状态：设计草案，待评审
+> 状态：已确认（已实现，99 个 pytest 用例通过）
 > 前置依赖：`bayesian-feedback-design.md`（反馈机制）、`decay-model-notes.md`（公式推导）
 
 ---
@@ -33,7 +33,8 @@
 ```
 ┌──────────────────────────────────────────┐
 │  第 3 层：CLI 命令（SKILL.md 直接调用）     │
-│  decay_engine.py scan / feedback / ...    │
+│  decay_engine.py scan/feedback/reset/     │
+│                   inject/invalidate       │
 ├──────────────────────────────────────────┤
 │  第 2 层：组合模型（业务逻辑）              │
 │  core/models.py                           │
@@ -71,7 +72,7 @@
 将原子公式组装成业务模型。这一层知道"业务含义"但不知道"数据从哪来"。
 
 当前模型：
-- `confidence(type, confirmed_date, alpha, beta)` → 计算置信度 C(t)，返回数值
+- `confidence(type, confirmed_date, alpha, beta, c0=1.0)` → 计算置信度 C(t) = c0 × e^(-λ_eff × t)，返回数值
 - `classify_confidence(c_value)` → 根据阈值返回 TRUST / VERIFY / REVALIDATE
 
 预留扩展：
@@ -83,8 +84,11 @@
 负责 markdown 文件中 decay 标签的解析和写入。
 
 - `parse_decay_tags(file_path)` → 从 .md 文件提取所有 decay 标签及其位置
-- `write_decay_tag(file_path, line, updates)` → 更新指定位置的标签字段
-- `scan_references(dir_path)` → 扫描整个 references/ 目录
+- `update_decay_tag(file_path, line, updates)` → 更新指定位置的标签字段
+- `increment_feedback(file_path, line, result)` → 递增 alpha/beta
+- `reset_entry(file_path, line)` → 重置为新鲜状态
+- `append_entry(file_path, type, content)` → 追加新知识条目（inject 调用）
+- `scan_directory(dir_path)` → 扫描整个 references/ 目录
 
 ### 2.4 第 3 层：CLI 命令（decay_engine.py）
 
@@ -105,6 +109,12 @@ python decay_engine.py feedback --file schema_map.md --line 7 --result failure
 
 # 重置（REVALIDATE 通过后）
 python decay_engine.py reset --file schema_map.md --line 7
+
+# 人工注入新知识
+python decay_engine.py inject --type business_rule --content "内容" --target business_rules.md
+
+# 人工标记知识待验证（C0 → 0.1）
+python decay_engine.py invalidate --file schema_map.md --line 7
 ```
 
 ---
@@ -201,10 +211,17 @@ fetch_index.py           独立运行
 - 实现 decay_engine.py reset 子命令
 - SKILL.md Gate 4 feedback 路径接入
 
-### Phase 3：SKILL.md 全面瘦身
+### Phase 3：SKILL.md 全面瘦身（已完成）
 - 移除 SKILL.md 中所有公式描述和 λ 表
-- 移除 DECAY_GOVERNANCE.md 中与 SKILL.md 重复的部分
+- 移除 DECAY_GOVERNANCE.md（已删除）
 - 验证瘦身后指令遵循率
+
+### Phase 4：人工入口（已完成 2026-03-14）
+- `inject` 子命令：人工注入新知识（parser.append_entry + CLI）
+- `invalidate` 子命令：人工标记知识待验证（C0 → 0.1, α=0, β=0）
+- `confidence()` 修正：支持 C0 参数，公式从 e^(-λt) 改为 c0 × e^(-λt)
+- SKILL.md 新增 Human Entry Points 指令块
+- 详见：`research/design/human-entry-points.md`
 
 ---
 

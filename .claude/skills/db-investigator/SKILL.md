@@ -93,6 +93,23 @@ Gate 5 — PLACEMENT: Which topic file? Which memory tier?
 
 **Default outcome is NO CHANGE.** Most interactions do not produce knowledge worth persisting. The gates' primary job is to reject, not to accept.
 
+### Human Entry Points
+
+```
+Human injection: When user explicitly shares domain knowledge
+  (signals: "记住", "注意这个", "这个要记下来", "remember this")
+  → Treat as knowledge candidate
+  → Run Gate 1-3 (VALUE / ALIGNMENT / REDUNDANCY) as normal
+  → If all pass: run `python $S/decay_engine.py inject --type <t> --content "<c>" --target <f>`
+  → If any gate fails: explain why to user, do not write
+
+Human correction: When user indicates existing knowledge is wrong
+  (signals: "这个变了", "这条不对", "这个规则已经废弃了")
+  → Identify the knowledge entry in references/
+  → Run: python $S/decay_engine.py invalidate --file <f> --line <n>
+  → Immediately treat as REVALIDATE: verify with tools before further use
+```
+
 ### Scaling Rules
 
 - Single topic file exceeds ~80 lines → split into sub-topics
@@ -113,6 +130,8 @@ python $S/decay_engine.py scan --file <topic_file>
 python $S/decay_engine.py scan --path $S/../references/
 python $S/decay_engine.py feedback --file <f> --line <n> --result success|failure
 python $S/decay_engine.py reset --file <f> --line <n>
+python $S/decay_engine.py inject --type <t> --content "<c>" --target <f>
+python $S/decay_engine.py invalidate --file <f> --line <n>
 ```
 
 ## Constraints

@@ -4,8 +4,13 @@ import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 SCRIPTS_DIR = str(Path(__file__).resolve().parent.parent)
+
+# Allow importing decay_engine from scripts dir
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
 
 
 def run_engine(*args, cwd=None):
@@ -192,3 +197,169 @@ class TestResetCLI:
             "reset", "--file", "/tmp/no_such_file_xyz.md", "--line", "1"
         )
         assert result.returncode == 1
+
+
+# ---------- inject subcommand ----------
+
+class TestInjectCommand:
+    """Tests for inject subcommand."""
+
+    def test_inject_basic(self, tmp_path, monkeypatch):
+        """Basic injection: file created with correct decay tag and content."""
+        import decay_engine
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", tmp_path)
+
+        args = SimpleNamespace(
+            command="inject",
+            type="schema",
+            content="users table has id, name, email columns",
+            target="business_rules.md",
+        )
+        rc = decay_engine.run_inject(args)
+        assert rc == 0
+
+        target_file = tmp_path / "business_rules.md"
+        assert target_file.exists()
+        content = target_file.read_text(encoding="utf-8")
+        assert f"confirmed={date.today().isoformat()}" in content
+        assert "type=schema" in content
+        assert "- users table has id, name, email columns" in content
+
+    def test_inject_stdout_message(self, tmp_path, monkeypatch, capsys):
+        """Stdout output contains [inject] and the target filename."""
+        import decay_engine
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", tmp_path)
+
+        args = SimpleNamespace(
+            command="inject",
+            type="business_rule",
+            content="Order status 1=active",
+            target="rules.md",
+        )
+        decay_engine.run_inject(args)
+        captured = capsys.readouterr()
+        assert "[inject]" in captured.out
+        assert "rules.md" in captured.out
+
+    def test_inject_invalid_type(self):
+        """Invalid --type is rejected by argparse (exit code 2)."""
+        result = run_engine(
+            "inject", "--type", "bogus_type",
+            "--content", "some text", "--target", "test.md"
+        )
+        assert result.returncode == 2
+
+    def test_inject_chinese_content(self, tmp_path, monkeypatch):
+        """Chinese content is written correctly."""
+        import decay_engine
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", tmp_path)
+
+        args = SimpleNamespace(
+            command="inject",
+            type="business_rule",
+            content="订单状态 1=有效 2=完成 3=取消",
+            target="chinese_rules.md",
+        )
+        rc = decay_engine.run_inject(args)
+        assert rc == 0
+
+        target_file = tmp_path / "chinese_rules.md"
+        content = target_file.read_text(encoding="utf-8")
+        assert "订单状态 1=有效 2=完成 3=取消" in content
+
+
+# ---------- invalidate subcommand ----------
+
+class TestInvalidateCommand:
+    """Tests for invalidate subcommand."""
+
+    def test_invalidate_basic(self, tmp_path):
+        """Basic invalidate: tag becomes C0=0.1, alpha=0, beta=0."""
+        f = _write_tag_file(
+            tmp_path, alpha=3, beta=1,
+            confirmed="2026-01-15", tag_type="schema",
+        )
+        result = run_engine(
+            "invalidate", "--file", str(f), "--line", "2"
+        )
+        assert result.returncode == 0
+
+        content = f.read_text(encoding="utf-8")
+        assert "C0=0.1" in content
+        assert "alpha=0" in content
+        assert "beta=0" in content
+        # confirmed and type should be preserved
+        assert "confirmed=2026-01-15" in content
+        assert "type=schema" in content
+
+    def test_invalidate_stdout_message(self, tmp_path):
+        """Stdout output contains [invalidate] and old values."""
+        f = _write_tag_file(
+            tmp_path, alpha=3, beta=1,
+            confirmed="2026-01-15", tag_type="schema",
+        )
+        result = run_engine(
+            "invalidate", "--file", str(f), "--line", "2"
+        )
+        assert result.returncode == 0
+        assert "[invalidate]" in result.stdout
+        # Check old values are reported
+        assert "C0=1.0" in result.stdout
+        assert "\u03b1=3" in result.stdout or "alpha=3" in result.stdout.lower()
+        assert "\u03b2=1" in result.stdout or "beta=1" in result.stdout.lower()
+
+    def test_invalidate_no_tag_at_line(self, tmp_path):
+        """Target line without a tag -> exit code 1 + stderr error."""
+        f = _write_tag_file(tmp_path)
+        # Line 1 is "# Heading", not a decay tag
+        result = run_engine(
+            "invalidate", "--file", str(f), "--line", "1"
+        )
+        assert result.returncode == 1
+        assert "Error" in result.stderr
+
+    def test_invalidate_file_not_found(self, tmp_path):
+        """Non-existent file -> exit code 1 + stderr error."""
+        result = run_engine(
+            "invalidate", "--file", str(tmp_path / "ghost.md"), "--line", "2"
+        )
+        assert result.returncode == 1
+        assert "Error" in result.stderr
+
+    def test_invalidate_then_scan_shows_revalidate(self, tmp_path):
+        """After invalidate, C0=0.1 means effective C(t) < 0.5 -> REVALIDATE."""
+        from core.models import confidence
+        from core.parser import parse_decay_tags
+
+        f = _write_tag_file(
+            tmp_path, alpha=3, beta=1,
+            confirmed=date.today().isoformat(), tag_type="schema",
+        )
+        # Invalidate the tag
+        result = run_engine(
+            "invalidate", "--file", str(f), "--line", "2"
+        )
+        assert result.returncode == 0
+
+        # After invalidation: C0=0.1, alpha=0, beta=0, confirmed unchanged (today)
+        # Verify the tag was updated in the file
+        tags = parse_decay_tags(str(f))
+        assert len(tags) == 1
+        tag = tags[0]
+        assert tag["C0"] == 0.1
+        assert tag["alpha"] == 0
+        assert tag["beta"] == 0
+
+        # C(t) from models.confidence returns e^(-lambda*0) = 1.0 (t=0)
+        # Effective confidence with C0 = C0 * confidence() = 0.1 * 1.0 = 0.1
+        c_base = confidence(
+            tag["type"], tag["confirmed"],
+            alpha=tag["alpha"], beta=tag["beta"],
+        )
+        effective_c = tag["C0"] * c_base
+        assert effective_c < 0.5, (
+            f"Expected effective C < 0.5 (REVALIDATE), got {effective_c}"
+        )

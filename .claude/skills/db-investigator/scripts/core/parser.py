@@ -388,6 +388,7 @@ def increment_feedback(
         return {
             "type": parsed["type"],
             "confirmed": parsed["confirmed"],
+            "C0": parsed["C0"],
             "alpha": new_alpha,
             "beta": parsed["beta"],
             "action": action,
@@ -399,6 +400,7 @@ def increment_feedback(
         return {
             "type": parsed["type"],
             "confirmed": parsed["confirmed"],
+            "C0": parsed["C0"],
             "alpha": parsed["alpha"],
             "beta": new_beta,
             "action": action,
@@ -460,6 +462,7 @@ def reset_entry(
     return {
         "type": parsed["type"],
         "confirmed": today_str,
+        "C0": 1.0,
         "alpha": 0,
         "beta": 0,
         "action": (
@@ -467,3 +470,69 @@ def reset_entry(
             f"\u03b1={old_alpha} \u03b2={old_beta})"
         ),
     }
+
+
+def append_entry(
+    file_path: str, knowledge_type: str, content: str
+) -> int:
+    """Append a new knowledge entry (decay tag + content line) to a file.
+
+    If the target file does not exist, it is created with a minimal
+    markdown template (title + description comment).
+
+    Args:
+        file_path:      Absolute or relative path to the target markdown file.
+        knowledge_type: Must be one of VALID_TYPES.
+        content:        Single-line knowledge text (written as a markdown bullet).
+
+    Returns:
+        1-based line number of the newly written decay tag.
+
+    Raises:
+        ValueError: If knowledge_type is not in VALID_TYPES.
+    """
+    if knowledge_type not in VALID_TYPES:
+        raise ValueError(
+            f"Invalid knowledge_type '{knowledge_type}'. "
+            f"Must be one of: {sorted(VALID_TYPES)}"
+        )
+
+    path = Path(file_path)
+
+    if not path.exists():
+        # Create file with minimal markdown template
+        stem = path.stem  # filename without .md
+        title = stem.replace("_", " ").capitalize()
+        template = f"# {title}\n\n> 通过五道门治理协议管理。\n"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(template, encoding="utf-8")
+
+    # Read existing content
+    existing = path.read_text(encoding="utf-8")
+
+    # Build the text to append
+    today_str = date.today().isoformat()
+    tag_line = f"<!-- decay: type={knowledge_type} confirmed={today_str} C0=1.0 -->"
+    content_line = f"- {content}"
+
+    # If file doesn't end with newline, add one first (so we get blank-line separation)
+    parts = []
+    if existing and not existing.endswith("\n"):
+        parts.append("\n")
+    parts.append("\n")           # blank line separator
+    parts.append(tag_line + "\n")
+    parts.append(content_line + "\n")
+
+    append_text = "".join(parts)
+
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(append_text)
+
+    # Determine the 1-based line number of the tag line by counting
+    # lines in the final file content. The tag is always the
+    # second-to-last line (content_line is the last line).
+    full = path.read_text(encoding="utf-8")
+    total_lines = len(full.splitlines())
+    tag_lineno = total_lines - 1  # tag line, then content line
+
+    return tag_lineno
