@@ -112,6 +112,7 @@ python decay_engine.py inject \
   --type <knowledge_type> \       # schema|business_rule|query_pattern|...
   --content "<知识内容>" \         # 要写入的知识文本
   --target <filename.md>          # 目标文件（references/ 下）
+  [--entities "<e1>,<e2>"]        # 可选：实体名（Phase 5A 新增）
 ```
 
 **写入格式（已锁定）：** 沿用现有 `query_patterns.md` 的格式，追加"空行 + decay tag 行 + 内容行"：
@@ -119,8 +120,11 @@ python decay_engine.py inject \
 ```markdown
 
 <!-- decay: type=business_rule confirmed=2026-03-14 C0=1.0 -->
+<!-- entities: t_order, order_status -->
 - order_status=5 表示已退款，不是已取消
 ```
+
+> entities 标签可选，在 `--entities` 参数指定时写入。粒度为表名/SP名/业务概念，不含字段名。详见 `formula-opportunity-analysis.md` §6.2。
 
 不自动生成 heading。heading 是组织层（分组），不是条目层。条目自动归属到文件末尾最近的 heading 下。Phase 1 的 `--content` 只支持单行文本。
 
@@ -237,10 +241,11 @@ Human correction: When user indicates existing knowledge is wrong
 ```
 decay_engine.py
   ├── scan         ← 查看知识置信度状态（已实现）
-  ├── feedback     ← 记录使用反馈 success/failure（已实现）
+  ├── search       ← 按实体/置信度搜索知识（已实现，Phase 5A）
+  ├── feedback     ← 记录使用反馈 success/failure + 加权（已实现，Phase 5B 扩展 --weight）
   ├── reset        ← 重验证通过后恢复为全新状态（已实现）
-  ├── inject       ← 人工注入新知识（待实现）
-  └── invalidate   ← 人工标记知识为待验证（待实现）
+  ├── inject       ← 人工注入新知识 + entities 标签（已实现，Phase 5A 扩展 --entities）
+  └── invalidate   ← 人工标记知识为待验证（已实现）
 ```
 
 **所有知识的生命周期操作都通过同一个 CLI 入口。** 这意味着：

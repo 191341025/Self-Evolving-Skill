@@ -68,6 +68,18 @@ class TestBayesianFactor:
         with pytest.raises(ValueError):
             bayesian_factor(0, -1)
 
+    def test_float_alpha(self):
+        """Float alpha (from soft signal): (0+1)/(0.3+1) = 1/1.3."""
+        assert bayesian_factor(0.3, 0) == pytest.approx(1 / 1.3)
+
+    def test_float_beta(self):
+        """Float beta: (0.3+1)/(0+1) = 1.3."""
+        assert bayesian_factor(0, 0.3) == pytest.approx(1.3)
+
+    def test_float_both(self):
+        """Mixed float: (0.6+1)/(1.3+1) = 1.6/2.3."""
+        assert bayesian_factor(1.3, 0.6) == pytest.approx(1.6 / 2.3)
+
 
 # ---------- effective_lambda ----------
 

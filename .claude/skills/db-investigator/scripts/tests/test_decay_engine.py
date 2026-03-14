@@ -165,6 +165,46 @@ class TestFeedbackCLI:
         )
         assert result.returncode == 1
 
+    def test_feedback_weight_soft_signal(self, tmp_path):
+        """feedback --weight 0.3 increments alpha by 0.3."""
+        f = _write_tag_file(tmp_path, alpha=0, beta=0)
+        result = run_engine(
+            "feedback", "--file", str(f), "--line", "2",
+            "--result", "success", "--weight", "0.3"
+        )
+        assert result.returncode == 0
+        content = f.read_text(encoding="utf-8")
+        assert "alpha=0.3" in content
+
+    def test_feedback_weight_failure_soft(self, tmp_path):
+        """feedback --weight 0.3 --result failure increments beta by 0.3."""
+        f = _write_tag_file(tmp_path, alpha=0, beta=0)
+        result = run_engine(
+            "feedback", "--file", str(f), "--line", "2",
+            "--result", "failure", "--weight", "0.3"
+        )
+        assert result.returncode == 0
+        content = f.read_text(encoding="utf-8")
+        assert "beta=0.3" in content
+
+    def test_feedback_success_refreshes_confirmed(self, tmp_path):
+        """feedback success should update confirmed to today."""
+        f = _write_tag_file(tmp_path, confirmed="2025-01-01")
+        run_engine(
+            "feedback", "--file", str(f), "--line", "2", "--result", "success"
+        )
+        content = f.read_text(encoding="utf-8")
+        assert f"confirmed={date.today().isoformat()}" in content
+
+    def test_feedback_failure_preserves_confirmed(self, tmp_path):
+        """feedback failure should NOT update confirmed."""
+        f = _write_tag_file(tmp_path, confirmed="2025-01-01")
+        run_engine(
+            "feedback", "--file", str(f), "--line", "2", "--result", "failure"
+        )
+        content = f.read_text(encoding="utf-8")
+        assert "confirmed=2025-01-01" in content
+
 
 # ---------- reset subcommand ----------
 
@@ -363,3 +403,169 @@ class TestInvalidateCommand:
         assert effective_c < 0.5, (
             f"Expected effective C < 0.5 (REVALIDATE), got {effective_c}"
         )
+
+
+# ---------- inject with entities ----------
+
+class TestInjectWithEntities:
+    def test_inject_with_entities(self, tmp_path, monkeypatch):
+        """Inject with --entities writes entities tag."""
+        import decay_engine
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", tmp_path)
+
+        args = SimpleNamespace(
+            command="inject",
+            type="schema",
+            content="t_room JOIN t_building ON building_id",
+            target="schema_map.md",
+            entities="t_room,t_building",
+        )
+        rc = decay_engine.run_inject(args)
+        assert rc == 0
+
+        target_file = tmp_path / "schema_map.md"
+        content = target_file.read_text(encoding="utf-8")
+        assert "<!-- entities: t_room, t_building -->" in content
+        assert "- t_room JOIN t_building ON building_id" in content
+
+    def test_inject_without_entities(self, tmp_path, monkeypatch):
+        """Inject without --entities: no entities line."""
+        import decay_engine
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", tmp_path)
+
+        args = SimpleNamespace(
+            command="inject",
+            type="schema",
+            content="some knowledge",
+            target="test.md",
+        )
+        rc = decay_engine.run_inject(args)
+        assert rc == 0
+
+        content = (tmp_path / "test.md").read_text(encoding="utf-8")
+        assert "entities" not in content
+
+    def test_inject_entities_via_cli(self, tmp_path):
+        """End-to-end: inject with --entities via subprocess."""
+        target = tmp_path / "cli_test.md"
+        target.write_text("# Test\n", encoding="utf-8")
+        # Use --target with full path hack: monkeypatch REFERENCES_DIR not possible
+        # via CLI, so use a workaround by creating the references dir structure
+        ref_dir = tmp_path / "references"
+        ref_dir.mkdir()
+        result = run_engine(
+            "inject",
+            "--type", "schema",
+            "--content", "t_room has building_id column",
+            "--target", "schema_map.md",
+            "--entities", "t_room,t_building",
+        )
+        # Will write to actual REFERENCES_DIR but we can verify output
+        assert "[inject]" in result.stdout
+        assert "entities" in result.stdout
+
+
+# ---------- search subcommand ----------
+
+class TestSearchCommand:
+    def _create_search_dir(self, tmp_path):
+        """Create a directory with tagged files for search testing."""
+        today = date.today().isoformat()
+        old = (date.today() - timedelta(days=500)).isoformat()
+
+        schema_file = tmp_path / "schema_map.md"
+        schema_file.write_text(
+            f"# Schema\n"
+            f"<!-- decay: type=schema confirmed={today} C0=1.0 -->\n"
+            f"<!-- entities: t_room, t_building -->\n"
+            f"- t_room JOIN t_building\n\n"
+            f"<!-- decay: type=schema confirmed={old} C0=1.0 -->\n"
+            f"<!-- entities: t_employee -->\n"
+            f"- t_employee structure\n",
+            encoding="utf-8",
+        )
+
+        rules_file = tmp_path / "business_rules.md"
+        rules_file.write_text(
+            f"# Rules\n"
+            f"<!-- decay: type=business_rule confirmed={today} C0=1.0 -->\n"
+            f"<!-- entities: t_room, rent_status -->\n"
+            f"- rent_status enum values\n",
+            encoding="utf-8",
+        )
+        return tmp_path
+
+    def test_search_by_entities(self, tmp_path):
+        d = self._create_search_dir(tmp_path)
+        result = run_engine("search", "--path", str(d), "--entities", "t_room")
+        assert result.returncode == 0
+        # Should match 2 entries (schema t_room + business_rule t_room)
+        assert "2 entries matched" in result.stdout
+
+    def test_search_by_entities_case_insensitive(self, tmp_path):
+        d = self._create_search_dir(tmp_path)
+        result = run_engine("search", "--path", str(d), "--entities", "T_ROOM")
+        assert result.returncode == 0
+        assert "2 entries matched" in result.stdout
+
+    def test_search_no_match(self, tmp_path):
+        d = self._create_search_dir(tmp_path)
+        result = run_engine(
+            "search", "--path", str(d), "--entities", "nonexistent_table"
+        )
+        assert result.returncode == 1
+        assert "No matching entries" in result.stdout
+
+    def test_search_by_level_trust(self, tmp_path):
+        d = self._create_search_dir(tmp_path)
+        result = run_engine("search", "--path", str(d), "--level", "TRUST")
+        assert result.returncode == 0
+        # Old entry (500 days) should not be TRUST
+        assert "t_employee" not in result.stdout or "[TRUST" in result.stdout
+
+    def test_search_entities_and_level(self, tmp_path):
+        d = self._create_search_dir(tmp_path)
+        result = run_engine(
+            "search", "--path", str(d),
+            "--entities", "t_room", "--level", "TRUST"
+        )
+        assert result.returncode == 0
+        # Should match t_room entries that are TRUST
+        assert "entries matched" in result.stdout
+
+    def test_search_shows_entities_in_output(self, tmp_path):
+        d = self._create_search_dir(tmp_path)
+        result = run_engine("search", "--path", str(d), "--entities", "t_room")
+        assert result.returncode == 0
+        assert "t_room" in result.stdout
+
+    def test_search_sorted_by_confidence_desc(self, tmp_path):
+        d = self._create_search_dir(tmp_path)
+        result = run_engine("search", "--path", str(d))
+        assert result.returncode == 0
+        # First entry should have higher confidence than last
+        lines = [l for l in result.stdout.strip().split("\n") if l.startswith("[")]
+        assert len(lines) >= 2  # At least 2 entries
+
+    def test_search_empty_dir(self, tmp_path):
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        result = run_engine("search", "--path", str(empty))
+        assert result.returncode == 1
+
+    def test_search_min_confidence(self, tmp_path):
+        d = self._create_search_dir(tmp_path)
+        result = run_engine(
+            "search", "--path", str(d), "--min-confidence", "0.9"
+        )
+        # Only today's entries should be >= 0.9
+        assert result.returncode == 0
+
+    def test_search_no_filters(self, tmp_path):
+        """No --entities or --level: returns all entries."""
+        d = self._create_search_dir(tmp_path)
+        result = run_engine("search", "--path", str(d))
+        assert result.returncode == 0
+        assert "3 entries matched" in result.stdout

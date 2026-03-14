@@ -1,7 +1,7 @@
 # 计算层架构设计：从 Prompt 到 Tool
 
 > Self-Evolving Skill 设计文档
-> 状态：已确认（已实现，99 个 pytest 用例通过）
+> 状态：已确认（已实现，143 个 pytest 用例通过，含 Phase 5 扩展）
 > 前置依赖：`bayesian-feedback-design.md`（反馈机制）、`decay-model-notes.md`（公式推导）
 
 ---
@@ -31,23 +31,25 @@
 ## 2. 分层架构
 
 ```
-┌──────────────────────────────────────────┐
-│  第 3 层：CLI 命令（SKILL.md 直接调用）     │
-│  decay_engine.py scan/feedback/reset/     │
-│                   inject/invalidate       │
-├──────────────────────────────────────────┤
-│  第 2 层：组合模型（业务逻辑）              │
-│  core/models.py                           │
-│  confidence() = decay() × bayesian()      │
-├──────────────────────────────────────────┤
-│  第 1 层：原子公式（纯数学，无副作用）       │
-│  core/formulas.py                         │
-│  exponential_decay() / bayesian_factor()  │
-├──────────────────────────────────────────┤
-│  I/O 层：标签解析 + 文件读写               │
-│  core/parser.py                           │
-│  parse_decay_tags() / write_decay_tag()   │
-└──────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│  第 3 层：CLI 命令（SKILL.md 直接调用）         │
+│  decay_engine.py scan/feedback/reset/         │
+│                   inject/invalidate/search     │
+├──────────────────────────────────────────────┤
+│  第 2 层：组合模型（业务逻辑）                  │
+│  core/models.py                               │
+│  confidence() = c0 × decay() × bayesian()    │
+├──────────────────────────────────────────────┤
+│  第 1 层：原子公式（纯数学，无副作用）           │
+│  core/formulas.py                             │
+│  exponential_decay() / bayesian_factor()      │
+│  alpha/beta 为 float（支持 w_soft=0.3 增量）  │
+├──────────────────────────────────────────────┤
+│  I/O 层：标签解析 + 文件读写                    │
+│  core/parser.py                               │
+│  parse_decay_tags() + parse_entities_tag()    │
+│  update_decay_tag() / update_entities_tag()   │
+└──────────────────────────────────────────────┘
 ```
 
 ### 2.1 第 1 层：原子公式（core/formulas.py）
@@ -61,7 +63,7 @@
 
 当前公式：
 - `exponential_decay(lambda_val, t)` → `e^(-λt)`
-- `bayesian_factor(alpha, beta)` → `(β+1)/(α+1)`
+- `bayesian_factor(alpha: float, beta: float)` → `(β+1)/(α+1)`，支持浮点（w_soft=0.3 增量）
 - `effective_lambda(lambda_base, alpha, beta)` → `λ_base × bayesian_factor`
 
 预留扩展：
@@ -72,7 +74,7 @@
 将原子公式组装成业务模型。这一层知道"业务含义"但不知道"数据从哪来"。
 
 当前模型：
-- `confidence(type, confirmed_date, alpha, beta, c0=1.0)` → 计算置信度 C(t) = c0 × e^(-λ_eff × t)，返回数值
+- `confidence(type, confirmed_date, alpha: float, beta: float, c0=1.0)` → 计算置信度 C(t) = c0 × e^(-λ_eff × t)，返回数值
 - `classify_confidence(c_value)` → 根据阈值返回 TRUST / VERIFY / REVALIDATE
 
 预留扩展：
@@ -83,11 +85,13 @@
 
 负责 markdown 文件中 decay 标签的解析和写入。
 
-- `parse_decay_tags(file_path)` → 从 .md 文件提取所有 decay 标签及其位置
+- `parse_decay_tags(file_path)` → 从 .md 文件提取所有 decay 标签及其位置（含 entities 标签 lookahead）
+- `parse_entities_tag(line)` → 解析 `<!-- entities: t_room, t_building -->` 标签
 - `update_decay_tag(file_path, line, updates)` → 更新指定位置的标签字段
-- `increment_feedback(file_path, line, result)` → 递增 alpha/beta
+- `update_entities_tag(file_path, line, entities)` → 更新指定位置的 entities 标签
+- `increment_feedback(file_path, line, result, weight=1.0)` → 递增 alpha/beta（支持加权）；success 刷新 confirmed_at
 - `reset_entry(file_path, line)` → 重置为新鲜状态
-- `append_entry(file_path, type, content)` → 追加新知识条目（inject 调用）
+- `append_entry(file_path, type, content, entities=None)` → 追加新知识条目（含可选 entities 标签）
 - `scan_directory(dir_path)` → 扫描整个 references/ 目录
 
 ### 2.4 第 3 层：CLI 命令（decay_engine.py）
@@ -99,23 +103,29 @@
 python decay_engine.py scan [--path references/] [--file schema_map.md]
 
 # 输出示例：
-# [TRUST]      schema_map.md:7       C=0.951  schema      α=3 β=0  17d
+# [TRUST]      schema_map.md:7       C=0.951  schema      α=3 β=0  17d  [t_room, t_building]
 # [VERIFY]     query_patterns.md:33  C=0.723  tool_exp    α=1 β=1  65d
 # [REVALIDATE] business_rules.md:8   C=0.412  biz_rule    α=0 β=2  112d
 
-# 记录反馈（成功/失败）
+# 按实体搜索 + 置信等级过滤
+python decay_engine.py search --path references/ --entities "t_room,t_building" --level TRUST
+python decay_engine.py search --path references/ --min-confidence 0.8
+
+# 记录反馈（硬信号 weight=1.0 默认，软信号 weight=0.3）
 python decay_engine.py feedback --file schema_map.md --line 7 --result success
-python decay_engine.py feedback --file schema_map.md --line 7 --result failure
+python decay_engine.py feedback --file schema_map.md --line 7 --result failure --weight 0.3
 
 # 重置（REVALIDATE 通过后）
 python decay_engine.py reset --file schema_map.md --line 7
 
-# 人工注入新知识
-python decay_engine.py inject --type business_rule --content "内容" --target business_rules.md
+# 人工注入新知识（含 entities 标签）
+python decay_engine.py inject --type business_rule --content "内容" --target business_rules.md --entities "t_order,refund"
 
 # 人工标记知识待验证（C0 → 0.1）
 python decay_engine.py invalidate --file schema_map.md --line 7
 ```
+
+> 完整 CLI 参考：`research/design/cli-reference.md`
 
 ---
 
@@ -222,6 +232,17 @@ fetch_index.py           独立运行
 - `confidence()` 修正：支持 C0 参数，公式从 e^(-λt) 改为 c0 × e^(-λt)
 - SKILL.md 新增 Human Entry Points 指令块
 - 详见：`research/design/human-entry-points.md`
+
+### Phase 5：formula-opportunity-analysis 设计决策实现（已完成 2026-03-14）
+
+来源：`research/design/formula-opportunity-analysis.md` 锁定的 7 项设计决策
+
+- **5A entities 标签**：parse_entities_tag / update_entities_tag / append_entry(entities) / inject --entities / search 子命令
+- **5B w_soft 软信号加权**：alpha/beta int→float / increment_feedback(weight) / feedback --weight 0.3 / success 刷新 confirmed_at
+- **5C C(t) 检索过滤器**：search --level TRUST|VERIFY|REVALIDATE / search --min-confidence
+- **5D SKILL.md 步骤式指令重写**：Gate 2/3 步骤化、知识检索用 search 驱动、硬/软信号区分
+- 143 个 pytest 用例全部通过（新增 44 个）
+- 详见：`research/design/formula-opportunity-analysis.md`、`research/design/cli-reference.md`
 
 ---
 

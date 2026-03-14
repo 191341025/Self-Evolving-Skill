@@ -23,6 +23,7 @@ def sample_md_file(tmp_path):
 ### users table
 The users table has columns id, name, email.
 <!-- decay: type=schema confirmed={today} C0=1.0 -->
+<!-- entities: t_user, t_email -->
 
 ### order status rules
 Orders use status 1=active, 2=completed, 3=cancelled.

@@ -29,7 +29,7 @@ def exponential_decay(lambda_val: float, t: float) -> float:
     return math.exp(-lambda_val * t)
 
 
-def bayesian_factor(alpha: int, beta: int) -> float:
+def bayesian_factor(alpha: float, beta: float) -> float:
     """Bayesian adjustment factor: (beta + 1) / (alpha + 1).
 
     Encodes feedback history as a multiplier on the decay rate:
@@ -37,9 +37,12 @@ def bayesian_factor(alpha: int, beta: int) -> float:
       - More successes -> factor < 1 (slower decay)
       - More failures  -> factor > 1 (faster decay)
 
+    Supports fractional values for weighted soft-signal feedback
+    (e.g., w_soft=0.3 increments).
+
     Args:
-        alpha: Number of positive/success feedback events (>= 0).
-        beta:  Number of negative/failure feedback events (>= 0).
+        alpha: Cumulative positive/success feedback weight (>= 0).
+        beta:  Cumulative negative/failure feedback weight (>= 0).
 
     Returns:
         Adjustment factor (positive float).
@@ -54,7 +57,7 @@ def bayesian_factor(alpha: int, beta: int) -> float:
     return (beta + 1) / (alpha + 1)
 
 
-def effective_lambda(lambda_base: float, alpha: int, beta: int) -> float:
+def effective_lambda(lambda_base: float, alpha: float, beta: float) -> float:
     """Effective decay rate adjusted by Bayesian feedback.
 
     effective_lambda = lambda_base * bayesian_factor(alpha, beta)

@@ -25,8 +25,8 @@ VERIFY_THRESHOLD: float = 0.5
 def confidence(
     knowledge_type: str,
     confirmed_date: str,
-    alpha: int = 0,
-    beta: int = 0,
+    alpha: float = 0,
+    beta: float = 0,
     c0: float = 1.0,
 ) -> float:
     """Calculate confidence C(t) for a knowledge entry.

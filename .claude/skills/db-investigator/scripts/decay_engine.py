@@ -18,7 +18,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from core.models import confidence, classify_confidence
+from core.models import (
+    TRUST_THRESHOLD,
+    VERIFY_THRESHOLD,
+    confidence,
+    classify_confidence,
+)
 from core.parser import (
     VALID_TYPES,
     append_entry,
@@ -28,6 +33,7 @@ from core.parser import (
     reset_entry,
     scan_directory,
     update_decay_tag,
+    update_entities_tag,
 )
 from core.formulas import days_since
 
@@ -45,14 +51,19 @@ TYPE_SHORT: dict[str, str] = {
 }
 
 
-def format_entry(entry: dict, use_relative: bool = False) -> str:
+def format_entry(
+    entry: dict,
+    use_relative: bool = False,
+    show_entities: bool = False,
+) -> str:
     """Format a single decay entry into one display line.
 
     Args:
         entry: Dict with keys from parser (line, type, confirmed, C0,
-               alpha, beta, context) and optionally 'file'.
+               alpha, beta, context, entities) and optionally 'file'.
         use_relative: If True, use entry['file'] (relative path from
                       --path mode). If False, use just the filename.
+        show_entities: If True, append entities to the output.
 
     Returns:
         Formatted string for terminal output.
@@ -71,7 +82,6 @@ def format_entry(entry: dict, use_relative: bool = False) -> str:
     if use_relative and "file" in entry:
         location = f"{entry['file']}:{entry['line']}"
     else:
-        # Extract just the filename when using --file mode
         if "file" in entry:
             fname = Path(entry["file"]).name
         else:
@@ -81,7 +91,7 @@ def format_entry(entry: dict, use_relative: bool = False) -> str:
     alpha = entry["alpha"]
     beta = entry["beta"]
 
-    return (
+    line = (
         f"[{level:<12s}] "
         f"{location:<30s} "
         f"C={c_val:.3f}  "
@@ -89,6 +99,11 @@ def format_entry(entry: dict, use_relative: bool = False) -> str:
         f"\u03b1={alpha} \u03b2={beta}  "
         f"{t}d"
     )
+
+    if show_entities and entry.get("entities"):
+        line += f"  [{', '.join(entry['entities'])}]"
+
+    return line
 
 
 def run_scan(args: argparse.Namespace) -> int:
@@ -182,8 +197,9 @@ def run_feedback(args: argparse.Namespace) -> int:
     Returns:
         Exit code: 0 on success, 1 on error.
     """
+    weight = getattr(args, "weight", 1.0) or 1.0
     try:
-        result = increment_feedback(args.file, args.line, args.result)
+        result = increment_feedback(args.file, args.line, args.result, weight=weight)
     except (FileNotFoundError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
@@ -239,8 +255,17 @@ def run_reset(args: argparse.Namespace) -> int:
 def run_inject(args: argparse.Namespace) -> int:
     """Handle the 'inject' subcommand."""
     target_path = REFERENCES_DIR / args.target
-    lineno = append_entry(str(target_path), args.type, args.content)
-    print(f"[inject] \u2713 written to {args.target}:{lineno} (type: {args.type})")
+    entities = None
+    if hasattr(args, "entities") and args.entities:
+        entities = [e.strip() for e in args.entities.split(",") if e.strip()]
+    lineno = append_entry(
+        str(target_path), args.type, args.content, entities=entities
+    )
+    ent_info = f", entities: {entities}" if entities else ""
+    print(
+        f"[inject] \u2713 written to {args.target}:{lineno} "
+        f"(type: {args.type}{ent_info})"
+    )
     return 0
 
 
@@ -294,6 +319,85 @@ def run_invalidate(args: argparse.Namespace) -> int:
         return 1
 
 
+def run_search(args: argparse.Namespace) -> int:
+    """Handle the 'search' subcommand.
+
+    Searches knowledge entries by entity names and/or confidence level.
+    Results are sorted by confidence descending.
+
+    Returns:
+        Exit code: 0 on success (matches found), 1 on error or no matches.
+    """
+    search_path = args.path if args.path else str(REFERENCES_DIR)
+
+    if not Path(search_path).exists():
+        print(f"Error: directory not found: {search_path}", file=sys.stderr)
+        return 1
+
+    entries = scan_directory(search_path)
+
+    if not entries:
+        print("No decay tags found.")
+        return 1
+
+    # Filter by entities (OR match, case-insensitive)
+    if args.entities:
+        query_entities = set(
+            e.strip().lower() for e in args.entities.split(",") if e.strip()
+        )
+        entries = [
+            e for e in entries
+            if any(
+                ent.strip().lower() in query_entities
+                for ent in e.get("entities", [])
+            )
+        ]
+
+    # Filter by confidence level or min-confidence
+    if args.level:
+        level_thresholds = {
+            "TRUST": TRUST_THRESHOLD,
+            "VERIFY": VERIFY_THRESHOLD,
+            "REVALIDATE": 0.0,
+        }
+        min_c = level_thresholds.get(args.level, 0.0)
+        entries = [
+            e for e in entries
+            if confidence(
+                e["type"], e["confirmed"],
+                alpha=e["alpha"], beta=e["beta"], c0=e["C0"],
+            ) >= min_c
+        ]
+    elif args.min_confidence is not None:
+        entries = [
+            e for e in entries
+            if confidence(
+                e["type"], e["confirmed"],
+                alpha=e["alpha"], beta=e["beta"], c0=e["C0"],
+            ) >= args.min_confidence
+        ]
+
+    if not entries:
+        print("No matching entries.")
+        return 1
+
+    # Sort by confidence descending
+    def sort_key(e: dict) -> float:
+        return confidence(
+            e["type"], e["confirmed"],
+            alpha=e["alpha"], beta=e["beta"], c0=e["C0"],
+        )
+
+    entries.sort(key=sort_key, reverse=True)
+
+    for entry in entries:
+        print(format_entry(entry, use_relative=True, show_entities=True))
+
+    print("---")
+    print(f"{len(entries)} entries matched.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
     ap = argparse.ArgumentParser(
@@ -344,6 +448,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["success", "failure"],
         help="Feedback result: 'success' increments alpha, 'failure' increments beta.",
     )
+    fb_parser.add_argument(
+        "--weight",
+        type=float,
+        default=1.0,
+        help="Feedback weight: 1.0 for hard signals (default), 0.3 for soft signals.",
+    )
 
     # reset subcommand
     reset_parser = subparsers.add_parser(
@@ -384,6 +494,12 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Target filename in references/",
     )
+    sp_inject.add_argument(
+        "--entities",
+        type=str,
+        default=None,
+        help="Comma-separated entity names (table/SP/concept)",
+    )
 
     # invalidate subcommand
     sp_inv = subparsers.add_parser(
@@ -400,6 +516,38 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         type=int,
         help="1-based line number of the decay tag",
+    )
+
+    # search subcommand
+    sp_search = subparsers.add_parser(
+        "search",
+        help="Search knowledge entries by entity names and/or confidence level.",
+    )
+    sp_search.add_argument(
+        "--path",
+        type=str,
+        default=None,
+        help="Directory to search (default: references/).",
+    )
+    sp_search.add_argument(
+        "--entities",
+        type=str,
+        default=None,
+        help="Comma-separated entity names to match (OR logic).",
+    )
+    sp_search.add_argument(
+        "--level",
+        type=str,
+        default=None,
+        choices=["TRUST", "VERIFY", "REVALIDATE"],
+        help="Minimum confidence level filter.",
+    )
+    sp_search.add_argument(
+        "--min-confidence",
+        type=float,
+        default=None,
+        dest="min_confidence",
+        help="Minimum confidence value filter (mutually exclusive with --level).",
     )
 
     return ap
@@ -428,6 +576,9 @@ def main() -> int:
 
     if args.command == "invalidate":
         return run_invalidate(args)
+
+    if args.command == "search":
+        return run_search(args)
 
     ap.print_help()
     return 1

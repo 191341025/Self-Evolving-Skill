@@ -7,8 +7,10 @@ from datetime import date
 from core.parser import (
     parse_decay_tag,
     parse_decay_tags,
+    parse_entities_tag,
     scan_directory,
     update_decay_tag,
+    update_entities_tag,
     increment_feedback,
     reset_entry,
     append_entry,
@@ -283,7 +285,8 @@ class TestIncrementFeedback:
         assert "beta" in result
         assert "action" in result
         assert result["type"] == "business_rule"
-        assert result["confirmed"] == "2026-01-15"
+        # Success refreshes confirmed to today
+        assert result["confirmed"] == date.today().isoformat()
 
     def test_invalid_result_raises(self, tmp_path):
         """result='invalid' raises ValueError."""
@@ -439,3 +442,232 @@ class TestAppendEntry:
 
         # Blank line separates old content from new entry
         assert lines[lineno - 2].strip() == ""
+
+
+# ---------- parse_entities_tag ----------
+
+class TestParseEntitiesTag:
+    def test_valid_basic(self):
+        line = "<!-- entities: t_room, t_building -->"
+        result = parse_entities_tag(line)
+        assert result == ["t_room", "t_building"]
+
+    def test_single_entity(self):
+        line = "<!-- entities: t_user -->"
+        result = parse_entities_tag(line)
+        assert result == ["t_user"]
+
+    def test_extra_whitespace(self):
+        line = "<!-- entities:   t_room ,  t_building , t_floor  -->"
+        result = parse_entities_tag(line)
+        assert result == ["t_room", "t_building", "t_floor"]
+
+    def test_no_tag_returns_none(self):
+        assert parse_entities_tag("# Just a heading") is None
+        assert parse_entities_tag("") is None
+        assert parse_entities_tag("<!-- decay: type=schema -->") is None
+
+    def test_empty_entities_returns_none(self):
+        line = "<!-- entities:  -->"
+        result = parse_entities_tag(line)
+        assert result is None
+
+    def test_indented(self):
+        line = "    <!-- entities: t_room -->"
+        result = parse_entities_tag(line)
+        assert result == ["t_room"]
+
+
+# ---------- parse_decay_tags with entities ----------
+
+class TestParseDecayTagsWithEntities:
+    def test_entities_captured(self, sample_md_file):
+        """First tag has entities, second does not."""
+        results = parse_decay_tags(str(sample_md_file))
+        assert len(results) == 2
+        # First tag (schema) has entities from fixture
+        assert results[0]["entities"] == ["t_user", "t_email"]
+        # Second tag (business_rule) has no entities line after it
+        assert results[1]["entities"] == []
+
+    def test_no_entities_returns_empty_list(self, tmp_path):
+        content = (
+            "# Test\n"
+            "<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 -->\n"
+            "- Some knowledge\n"
+        )
+        f = tmp_path / "no_ent.md"
+        f.write_text(content, encoding="utf-8")
+        results = parse_decay_tags(str(f))
+        assert len(results) == 1
+        assert results[0]["entities"] == []
+
+    def test_entities_at_end_of_file(self, tmp_path):
+        """Decay tag at last line: no lookahead possible, entities=[]."""
+        content = "# Test\n<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 -->"
+        f = tmp_path / "end.md"
+        f.write_text(content, encoding="utf-8")
+        results = parse_decay_tags(str(f))
+        assert len(results) == 1
+        assert results[0]["entities"] == []
+
+
+# ---------- update_entities_tag ----------
+
+class TestUpdateEntitiesTag:
+    def test_update_basic(self, tmp_path):
+        content = (
+            "# Test\n"
+            "<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 -->\n"
+            "<!-- entities: t_room -->\n"
+            "- Some knowledge\n"
+        )
+        f = tmp_path / "ent_update.md"
+        f.write_text(content, encoding="utf-8")
+        assert update_entities_tag(str(f), 3, ["t_building", "t_floor"]) is True
+        updated = f.read_text(encoding="utf-8")
+        assert "<!-- entities: t_building, t_floor -->" in updated
+
+    def test_no_entities_tag_at_line(self, tmp_path):
+        content = "# Test\n<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 -->\n"
+        f = tmp_path / "no_ent.md"
+        f.write_text(content, encoding="utf-8")
+        with pytest.raises(ValueError, match="No entities tag"):
+            update_entities_tag(str(f), 1, ["t_room"])
+
+    def test_empty_entities_raises(self, tmp_path):
+        content = "# Test\n<!-- entities: t_room -->\n"
+        f = tmp_path / "empty.md"
+        f.write_text(content, encoding="utf-8")
+        with pytest.raises(ValueError, match="must not be empty"):
+            update_entities_tag(str(f), 2, [])
+
+    def test_file_not_found(self):
+        with pytest.raises(FileNotFoundError):
+            update_entities_tag("/tmp/nonexistent_xyz.md", 1, ["t_room"])
+
+
+# ---------- append_entry with entities ----------
+
+class TestAppendEntryWithEntities:
+    def test_append_with_entities(self, tmp_path):
+        target = tmp_path / "schema_map.md"
+        target.write_text("# Schema Map\n", encoding="utf-8")
+        lineno = append_entry(
+            str(target), "schema", "t_room JOIN t_building",
+            entities=["t_room", "t_building"],
+        )
+        content = target.read_text(encoding="utf-8")
+        lines = content.splitlines()
+        # Decay tag at lineno
+        assert "<!-- decay:" in lines[lineno - 1]
+        # Entities tag right after
+        assert "<!-- entities: t_room, t_building -->" in lines[lineno]
+        # Content after entities
+        assert "- t_room JOIN t_building" in lines[lineno + 1]
+
+    def test_append_without_entities(self, tmp_path):
+        target = tmp_path / "test.md"
+        target.write_text("# Test\n", encoding="utf-8")
+        lineno = append_entry(str(target), "schema", "Some knowledge")
+        content = target.read_text(encoding="utf-8")
+        lines = content.splitlines()
+        # Content directly after decay tag (no entities line)
+        assert "- Some knowledge" in lines[lineno]
+
+    def test_append_with_entities_parseable(self, tmp_path):
+        """Appended entry with entities is correctly parsed by parse_decay_tags."""
+        target = tmp_path / "parse_test.md"
+        target.write_text("# Test\n", encoding="utf-8")
+        append_entry(
+            str(target), "business_rule", "refund policy",
+            entities=["t_order", "refund"],
+        )
+        results = parse_decay_tags(str(target))
+        assert len(results) == 1
+        assert results[0]["entities"] == ["t_order", "refund"]
+        assert results[0]["type"] == "business_rule"
+
+
+# ---------- increment_feedback: confirmed_at refresh ----------
+
+class TestIncrementFeedbackConfirmedAt:
+    def test_success_refreshes_confirmed(self, tmp_path):
+        """Success should update confirmed to today."""
+        tag = "<!-- decay: type=schema confirmed=2025-01-01 C0=1.0 alpha=0 beta=0 -->"
+        f, lineno = _make_tag_file(tmp_path, tag)
+        result = increment_feedback(str(f), lineno, "success")
+        assert result["confirmed"] == date.today().isoformat()
+        content = f.read_text(encoding="utf-8")
+        assert f"confirmed={date.today().isoformat()}" in content
+
+    def test_failure_preserves_confirmed(self, tmp_path):
+        """Failure should NOT update confirmed."""
+        tag = "<!-- decay: type=schema confirmed=2025-01-01 C0=1.0 alpha=0 beta=0 -->"
+        f, lineno = _make_tag_file(tmp_path, tag)
+        result = increment_feedback(str(f), lineno, "failure")
+        assert result["confirmed"] == "2025-01-01"
+        content = f.read_text(encoding="utf-8")
+        assert "confirmed=2025-01-01" in content
+
+
+# ---------- increment_feedback: weighted feedback ----------
+
+class TestWeightedFeedback:
+    def test_soft_signal_success(self, tmp_path):
+        """weight=0.3 increments alpha by 0.3."""
+        tag = "<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 alpha=0 beta=0 -->"
+        f, lineno = _make_tag_file(tmp_path, tag)
+        result = increment_feedback(str(f), lineno, "success", weight=0.3)
+        assert result["alpha"] == 0.3
+        assert result["beta"] == 0
+        content = f.read_text(encoding="utf-8")
+        assert "alpha=0.3" in content
+
+    def test_soft_signal_failure(self, tmp_path):
+        """weight=0.3 increments beta by 0.3."""
+        tag = "<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 alpha=0 beta=0 -->"
+        f, lineno = _make_tag_file(tmp_path, tag)
+        result = increment_feedback(str(f), lineno, "failure", weight=0.3)
+        assert result["beta"] == 0.3
+        content = f.read_text(encoding="utf-8")
+        assert "beta=0.3" in content
+
+    def test_multiple_soft_signals_accumulate(self, tmp_path):
+        """3x soft signal (0.3) accumulates to 0.9."""
+        tag = "<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 alpha=0 beta=0 -->"
+        f, lineno = _make_tag_file(tmp_path, tag)
+        increment_feedback(str(f), lineno, "failure", weight=0.3)
+        increment_feedback(str(f), lineno, "failure", weight=0.3)
+        result = increment_feedback(str(f), lineno, "failure", weight=0.3)
+        # 0.3 + 0.3 + 0.3 = 0.9 (close enough with float precision)
+        assert abs(result["beta"] - 0.9) < 0.01
+
+    def test_mixed_hard_and_soft(self, tmp_path):
+        """Hard + soft signals accumulate correctly."""
+        tag = "<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 alpha=0 beta=0 -->"
+        f, lineno = _make_tag_file(tmp_path, tag)
+        increment_feedback(str(f), lineno, "success")  # alpha=1
+        result = increment_feedback(str(f), lineno, "success", weight=0.3)  # alpha=1.3
+        assert abs(result["alpha"] - 1.3) < 0.01
+
+    def test_float_alpha_beta_round_trip(self, tmp_path):
+        """Float alpha/beta survives write→parse round trip."""
+        tag = "<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 alpha=0 beta=0 -->"
+        f, lineno = _make_tag_file(tmp_path, tag)
+        increment_feedback(str(f), lineno, "success", weight=0.3)
+        # Re-parse the tag
+        from core.parser import parse_decay_tag
+        content = f.read_text(encoding="utf-8")
+        lines = content.splitlines()
+        parsed = parse_decay_tag(lines[lineno - 1])
+        assert parsed is not None
+        assert abs(parsed["alpha"] - 0.3) < 0.01
+
+    def test_zero_weight_raises(self, tmp_path):
+        """weight=0 should raise ValueError."""
+        tag = "<!-- decay: type=schema confirmed=2026-01-15 C0=1.0 alpha=0 beta=0 -->"
+        f, lineno = _make_tag_file(tmp_path, tag)
+        import pytest
+        with pytest.raises(ValueError, match="weight must be > 0"):
+            increment_feedback(str(f), lineno, "success", weight=0)

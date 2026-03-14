@@ -3,10 +3,12 @@ Decay tag parser layer for markdown knowledge files.
 
 Reads and extracts decay metadata tags embedded as HTML comments in
 markdown files. Phase 1 provides read-only scanning; Phase 2 adds
-in-place update, feedback increment, and reset operations.
+in-place update, feedback increment, and reset operations. Phase 5A
+adds entities tag support for entity-level matching.
 
 Tag format:
     <!-- decay: type=schema confirmed=2026-01-15 C0=1.0 [alpha=2] [beta=1] -->
+    <!-- entities: t_room, t_building -->
 """
 
 import re
@@ -28,6 +30,11 @@ VALID_TYPES = frozenset({
 # Regex for the overall decay tag structure
 _DECAY_TAG_RE = re.compile(
     r"<!--\s*decay:\s*(.+?)\s*-->"
+)
+
+# Regex for the entities tag structure
+_ENTITIES_TAG_RE = re.compile(
+    r"<!--\s*entities:\s*(.+?)\s*-->"
 )
 
 # Regex for individual key=value pairs inside the tag
@@ -109,10 +116,10 @@ def parse_decay_tag(line: str) -> Optional[Dict[str, Any]]:
         )
         return None
 
-    # Parse optional alpha (default 0)
+    # Parse optional alpha (default 0) — float to support weighted feedback
     alpha_raw = pairs.get("alpha", "0")
     try:
-        alpha = int(alpha_raw)
+        alpha = float(alpha_raw)
         if alpha < 0:
             raise ValueError("negative")
     except ValueError:
@@ -123,10 +130,10 @@ def parse_decay_tag(line: str) -> Optional[Dict[str, Any]]:
         )
         return None
 
-    # Parse optional beta (default 0)
+    # Parse optional beta (default 0) — float to support weighted feedback
     beta_raw = pairs.get("beta", "0")
     try:
-        beta = int(beta_raw)
+        beta = float(beta_raw)
         if beta < 0:
             raise ValueError("negative")
     except ValueError:
@@ -144,6 +151,28 @@ def parse_decay_tag(line: str) -> Optional[Dict[str, Any]]:
         "alpha": alpha,
         "beta": beta,
     }
+
+
+def parse_entities_tag(line: str) -> Optional[List[str]]:
+    """Parse a single line for an entities tag and return entity names.
+
+    Args:
+        line: A single line of text (may or may not contain a tag).
+
+    Returns:
+        A list of entity name strings on success, or None if the line
+        has no entities tag.
+
+    Example:
+        >>> parse_entities_tag('<!-- entities: t_room, t_building -->')
+        ['t_room', 't_building']
+    """
+    match = _ENTITIES_TAG_RE.search(line)
+    if not match:
+        return None
+    raw = match.group(1)
+    entities = [e.strip() for e in raw.split(",") if e.strip()]
+    return entities if entities else None
 
 
 def parse_decay_tags(file_path: str) -> List[Dict[str, Any]]:
@@ -176,25 +205,34 @@ def parse_decay_tags(file_path: str) -> List[Dict[str, Any]]:
     current_context: str = ""
 
     with open(path, "r", encoding="utf-8") as fh:
-        for line_num, line in enumerate(fh, start=1):
-            stripped = line.strip()
+        lines = list(fh)
 
-            # Track headings and first non-empty text as context
-            if stripped.startswith("#"):
-                # Remove leading '#' characters and whitespace for display
-                current_context = stripped.lstrip("#").strip()
-            elif stripped and not current_context:
-                # Use the first non-empty, non-heading line as fallback
-                current_context = stripped
+    for idx, line in enumerate(lines):
+        line_num = idx + 1
+        stripped = line.strip()
 
-            parsed = parse_decay_tag(line)
-            if parsed is not None:
-                entry = {
-                    "line": line_num,
-                    "context": current_context,
-                    **parsed,
-                }
-                results.append(entry)
+        # Track headings and first non-empty text as context
+        if stripped.startswith("#"):
+            current_context = stripped.lstrip("#").strip()
+        elif stripped and not current_context:
+            current_context = stripped
+
+        parsed = parse_decay_tag(line)
+        if parsed is not None:
+            # Lookahead: check next line for entities tag
+            entities: List[str] = []
+            if idx + 1 < len(lines):
+                entities_parsed = parse_entities_tag(lines[idx + 1])
+                if entities_parsed is not None:
+                    entities = entities_parsed
+
+            entry = {
+                "line": line_num,
+                "context": current_context,
+                "entities": entities,
+                **parsed,
+            }
+            results.append(entry)
 
     return results
 
@@ -249,6 +287,22 @@ def scan_directory(
 _TAG_FIELD_ORDER = ("type", "confirmed", "C0", "alpha", "beta")
 
 
+def _rebuild_entities_line(
+    entities: List[str], leading_whitespace: str
+) -> str:
+    """Reconstruct an entities tag line from a list of entity names.
+
+    Args:
+        entities: List of entity name strings.
+        leading_whitespace: Whitespace prefix to preserve indentation.
+
+    Returns:
+        A complete entities tag line (without trailing newline).
+    """
+    body = ", ".join(entities)
+    return f"{leading_whitespace}<!-- entities: {body} -->"
+
+
 def _rebuild_tag_line(fields: Dict[str, Any], leading_whitespace: str) -> str:
     """Reconstruct a decay tag line from field values.
 
@@ -262,9 +316,13 @@ def _rebuild_tag_line(fields: Dict[str, Any], leading_whitespace: str) -> str:
     parts = []
     for key in _TAG_FIELD_ORDER:
         val = fields[key]
-        # Format C0 to ensure it always has a decimal point
         if key == "C0":
+            # C0 always has a decimal point
             val = f"{float(val):.1f}" if float(val) == int(float(val)) else str(float(val))
+        elif key in ("alpha", "beta"):
+            # Show as int when whole number, float when fractional
+            fval = float(val)
+            val = str(int(fval)) if fval == int(fval) else str(fval)
         parts.append(f"{key}={val}")
     body = " ".join(parts)
     return f"{leading_whitespace}<!-- decay: {body} -->"
@@ -337,30 +395,97 @@ def update_decay_tag(
     return True
 
 
+def update_entities_tag(
+    file_path: str, line_number: int, entities: List[str]
+) -> bool:
+    """Update the entities tag at a given line in a file.
+
+    Reads the file, validates the target line contains an entities tag,
+    replaces it with the new entity list, and writes the file back.
+
+    Args:
+        file_path:   Absolute or relative path to the markdown file.
+        line_number: 1-based line number of the entities tag to update.
+        entities:    New list of entity names.
+
+    Returns:
+        True on success.
+
+    Raises:
+        FileNotFoundError: If file_path does not exist.
+        ValueError: If line_number is out of range, the target line has
+                    no entities tag, or entities is empty.
+    """
+    if not entities:
+        raise ValueError("entities list must not be empty")
+
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    with open(path, "r", encoding="utf-8") as fh:
+        lines = fh.readlines()
+
+    total_lines = len(lines)
+    if line_number < 1 or line_number > total_lines:
+        raise ValueError(
+            f"Line number {line_number} out of range "
+            f"(file has {total_lines} lines)"
+        )
+
+    idx = line_number - 1
+    target_line = lines[idx]
+
+    parsed = parse_entities_tag(target_line)
+    if parsed is None:
+        raise ValueError(f"No entities tag found at line {line_number}")
+
+    # Determine leading whitespace
+    stripped = target_line.lstrip()
+    leading_ws = target_line[: len(target_line) - len(stripped)]
+
+    new_tag = _rebuild_entities_line(entities, leading_ws)
+    trailing = "\n" if target_line.endswith("\n") else ""
+    lines[idx] = new_tag + trailing
+
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.writelines(lines)
+
+    return True
+
+
 def increment_feedback(
-    file_path: str, line_number: int, result: str
+    file_path: str, line_number: int, result: str, weight: float = 1.0
 ) -> Dict[str, Any]:
     """Increment alpha or beta for a decay tag and return updated info.
 
-    Convenience wrapper around update_decay_tag that bumps alpha by 1
-    on success or beta by 1 on failure.
+    Convenience wrapper around update_decay_tag that bumps alpha or beta
+    by the given weight. Hard signals use weight=1.0 (default), soft
+    signals use weight=0.3.
+
+    On success, confirmed_at is also refreshed to today (the knowledge
+    was used successfully, so it's effectively re-confirmed). On failure,
+    confirmed_at is NOT updated (time continues to accumulate).
 
     Args:
         file_path:   Path to the markdown file.
         line_number: 1-based line number of the decay tag.
         result:      "success" to increment alpha, "failure" to increment beta.
+        weight:      Feedback weight (default 1.0). Use 0.3 for soft signals.
 
     Returns:
-        Dict with keys: type, confirmed, alpha, beta, action.
+        Dict with keys: type, confirmed, C0, alpha, beta, action.
 
     Raises:
-        ValueError: If result is not "success" or "failure", or if the
-                    target line has no decay tag.
+        ValueError: If result is not "success" or "failure", weight <= 0,
+                    or the target line has no decay tag.
     """
     if result not in ("success", "failure"):
         raise ValueError(
             f"result must be 'success' or 'failure', got '{result}'"
         )
+    if weight <= 0:
+        raise ValueError(f"weight must be > 0, got {weight}")
 
     # Read current tag state
     path = Path(file_path)
@@ -381,22 +506,29 @@ def increment_feedback(
     if parsed is None:
         raise ValueError(f"No decay tag found at line {line_number}")
 
+    today_str = date.today().isoformat()
+    weight_label = f"+{weight}" if weight != 1.0 else "+1"
+
     if result == "success":
-        new_alpha = parsed["alpha"] + 1
-        update_decay_tag(file_path, line_number, {"alpha": new_alpha})
-        action = f"alpha +1 → {new_alpha}"
+        new_alpha = parsed["alpha"] + weight
+        updates: Dict[str, Any] = {
+            "alpha": new_alpha,
+            "confirmed": today_str,
+        }
+        update_decay_tag(file_path, line_number, updates)
+        action = f"alpha {weight_label} → {new_alpha}, confirmed → {today_str}"
         return {
             "type": parsed["type"],
-            "confirmed": parsed["confirmed"],
+            "confirmed": today_str,
             "C0": parsed["C0"],
             "alpha": new_alpha,
             "beta": parsed["beta"],
             "action": action,
         }
     else:
-        new_beta = parsed["beta"] + 1
+        new_beta = parsed["beta"] + weight
         update_decay_tag(file_path, line_number, {"beta": new_beta})
-        action = f"beta +1 → {new_beta}"
+        action = f"beta {weight_label} → {new_beta}"
         return {
             "type": parsed["type"],
             "confirmed": parsed["confirmed"],
@@ -473,7 +605,10 @@ def reset_entry(
 
 
 def append_entry(
-    file_path: str, knowledge_type: str, content: str
+    file_path: str,
+    knowledge_type: str,
+    content: str,
+    entities: Optional[List[str]] = None,
 ) -> int:
     """Append a new knowledge entry (decay tag + content line) to a file.
 
@@ -484,6 +619,7 @@ def append_entry(
         file_path:      Absolute or relative path to the target markdown file.
         knowledge_type: Must be one of VALID_TYPES.
         content:        Single-line knowledge text (written as a markdown bullet).
+        entities:       Optional list of entity names (table/SP/concept).
 
     Returns:
         1-based line number of the newly written decay tag.
@@ -521,6 +657,9 @@ def append_entry(
         parts.append("\n")
     parts.append("\n")           # blank line separator
     parts.append(tag_line + "\n")
+    if entities:
+        entities_line = f"<!-- entities: {', '.join(entities)} -->"
+        parts.append(entities_line + "\n")
     parts.append(content_line + "\n")
 
     append_text = "".join(parts)
@@ -528,11 +667,12 @@ def append_entry(
     with open(path, "a", encoding="utf-8") as fh:
         fh.write(append_text)
 
-    # Determine the 1-based line number of the tag line by counting
-    # lines in the final file content. The tag is always the
-    # second-to-last line (content_line is the last line).
+    # Determine the 1-based line number of the tag line.
+    # Layout: [decay tag] [entities tag if present] [content line]
     full = path.read_text(encoding="utf-8")
     total_lines = len(full.splitlines())
-    tag_lineno = total_lines - 1  # tag line, then content line
+    # Content is always last; entities (if present) is second-to-last; decay tag before that
+    lines_after_tag = 2 if entities else 1
+    tag_lineno = total_lines - lines_after_tag
 
     return tag_lineno
