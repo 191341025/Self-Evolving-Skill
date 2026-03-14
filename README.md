@@ -339,6 +339,7 @@ We ran full evolution experiments on real databases to validate the design patte
 |-----------|--------|--------|-------------|
 | [#01 nan-platform v1](experiments/01-nan-platform/) | Smart Building Mgmt (29 tables) | 5 | 63.6% rejection rate, increments converge +75→+1, 2 Gate 2 self-corrections |
 | [#01 nan-platform v2](experiments/01-nan-platform-v2/) | Same domain, Gate 4 validation | 5 | Confidence decay model verified, 25/25 tasks completed, Bayesian feedback validated |
+| [#03 nan-platform v3](experiments/03-nan-platform-v3/) | Same domain, Phase 5 validation | 5 | 6/6 verification points passed, entities+search enable precise Gate 2/3, hard/soft signals validated, 1 critical bug found (inject path) |
 
 Each experiment includes full evolution logs, Five-Gate decision records, quality audits, and per-round knowledge snapshots — you can diff any two rounds to observe exactly how the Skill's knowledge grew.
 
