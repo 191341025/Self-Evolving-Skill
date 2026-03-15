@@ -1,7 +1,7 @@
 # decay_engine.py CLI 参考
 
 > Self-Evolving Skill 设计文档
-> 状态：已实现（146 个 pytest 用例通过，含 v3 补丁 inject 路径校验 +3）
+> 状态：已实现（150 个 pytest 用例通过，含 v3 补丁 inject 路径校验 +3、init 子命令 +4）
 > 关联文档：`computation-layer-design.md`（分层架构）、`formula-opportunity-analysis.md`（设计决策来源）
 
 ---
@@ -12,6 +12,7 @@
 
 ```
 decay_engine.py
+  ├── init         初始化：创建 references/ + _index.md + db_config.ini
   ├── scan         查看知识置信度状态
   ├── search       按实体/置信度搜索知识
   ├── feedback     记录使用反馈（硬/软信号）
@@ -64,6 +65,46 @@ python $S/decay_engine.py <subcommand> [options]
 ---
 
 ## 子命令
+
+### init — 初始化
+
+首次使用时初始化 skill 环境。幂等操作，已存在的文件/目录不会被覆盖。
+
+```bash
+python decay_engine.py init
+```
+
+无参数。
+
+**创建内容**：
+
+| 产物 | 路径 | 说明 |
+|------|------|------|
+| references/ 目录 | `../references/` | 知识文件存放目录 |
+| `_index.md` | `../references/_index.md` | 路由表模板 |
+| `db_config.ini` | `./db_config.ini` | 数据库连接配置模板（需手动编辑） |
+
+**输出示例**（首次运行）：
+
+```
+[init] ✓ Created references/
+[init] ✓ Created _index.md
+[init] ✓ Created db_config.ini template — edit with your database credentials
+[init] Ready. Configure db_config.ini, then start investigating.
+```
+
+**输出示例**（重复运行）：
+
+```
+[init] references/ already exists
+[init] _index.md already exists
+[init] db_config.ini already exists
+[init] Ready. Configure db_config.ini, then start investigating.
+```
+
+**退出码**：0（始终成功）。
+
+---
 
 ### scan — 置信度扫描
 

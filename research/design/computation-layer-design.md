@@ -1,7 +1,7 @@
 # 计算层架构设计：从 Prompt 到 Tool
 
 > Self-Evolving Skill 设计文档
-> 状态：已确认（已实现，146 个 pytest 用例通过，含 Phase 5 扩展 + v3 补丁）
+> 状态：已确认（已实现，150 个 pytest 用例通过，含 Phase 5 扩展 + v3 补丁 + init 子命令）
 > 前置依赖：`bayesian-feedback-design.md`（反馈机制）、`decay-model-notes.md`（公式推导）
 
 ---
@@ -33,7 +33,7 @@
 ```
 ┌──────────────────────────────────────────────┐
 │  第 3 层：CLI 命令（SKILL.md 直接调用）         │
-│  decay_engine.py scan/feedback/reset/         │
+│  decay_engine.py init/scan/feedback/reset/    │
 │                   inject/invalidate/search     │
 ├──────────────────────────────────────────────┤
 │  第 2 层：组合模型（业务逻辑）                  │

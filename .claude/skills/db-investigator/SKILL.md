@@ -29,6 +29,13 @@ allowed-tools: Bash(python *db_query*), Bash(python *fetch_index*), Bash(python 
 
 **Tool experience**: When a query pattern or parameter combination proves especially effective (or a pitfall is discovered), note it in the relevant references/ file alongside the query template or investigation flow.
 
+## Initialization
+
+On first use or new environment, run: `python $S/decay_engine.py init`
+- Creates `references/` directory + `_index.md` template + `db_config.ini` template
+- Idempotent: safe to re-run, skips existing files
+- After init: edit `db_config.ini` with database credentials before any queries
+
 ## Domain Knowledge System
 
 ### Selective Loading Protocol
@@ -154,6 +161,9 @@ python $S/db_query.py --sql "<SELECT>" --database <db> [--limit N]
 python $S/fetch_structure.py --tables <t>[,t2] [--sample N] [--database <db>]
 python $S/fetch_structure.py --procedures <sp>[,sp2] [--database <db>]
 python $S/fetch_index.py [--database <db>]
+
+# Initialization
+python $S/decay_engine.py init
 
 # Knowledge lifecycle
 python $S/decay_engine.py scan --file <topic_file>

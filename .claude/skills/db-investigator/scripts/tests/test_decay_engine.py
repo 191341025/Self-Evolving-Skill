@@ -636,3 +636,99 @@ class TestSearchCommand:
         result = run_engine("search", "--path", str(d))
         assert result.returncode == 0
         assert "3 entries matched" in result.stdout
+
+
+# ---------- init subcommand ----------
+
+class TestInitCLI:
+    """Tests for init subcommand."""
+
+    def test_init_creates_all_from_scratch(self, tmp_path, monkeypatch):
+        """From empty state, init creates references/, _index.md, and db_config.ini."""
+        import decay_engine
+
+        refs_dir = tmp_path / "references"
+        config_path = tmp_path / "db_config.ini"
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", refs_dir)
+        monkeypatch.setattr(decay_engine, "DB_CONFIG_PATH", config_path)
+
+        args = SimpleNamespace(command="init")
+        rc = decay_engine.run_init(args)
+        assert rc == 0
+
+        # references/ directory created
+        assert refs_dir.is_dir()
+        # _index.md created with expected content
+        index_file = refs_dir / "_index.md"
+        assert index_file.exists()
+        index_content = index_file.read_text(encoding="utf-8")
+        assert "Domain Knowledge Index" in index_content
+        # db_config.ini created with expected content
+        assert config_path.exists()
+        config_content = config_path.read_text(encoding="utf-8")
+        assert "[database]" in config_content
+
+    def test_init_creates_all_from_scratch_stdout(self, tmp_path, monkeypatch, capsys):
+        """Stdout contains 'Created' for all three items on fresh init."""
+        import decay_engine
+
+        refs_dir = tmp_path / "references"
+        config_path = tmp_path / "db_config.ini"
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", refs_dir)
+        monkeypatch.setattr(decay_engine, "DB_CONFIG_PATH", config_path)
+
+        args = SimpleNamespace(command="init")
+        decay_engine.run_init(args)
+        captured = capsys.readouterr()
+
+        assert "Created references/" in captured.out
+        assert "Created _index.md" in captured.out
+        assert "Created db_config.ini" in captured.out
+        assert "Ready." in captured.out
+
+    def test_init_idempotent(self, tmp_path, monkeypatch, capsys):
+        """Running init twice: second run says 'already exists' for all."""
+        import decay_engine
+
+        refs_dir = tmp_path / "references"
+        config_path = tmp_path / "db_config.ini"
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", refs_dir)
+        monkeypatch.setattr(decay_engine, "DB_CONFIG_PATH", config_path)
+
+        args = SimpleNamespace(command="init")
+        decay_engine.run_init(args)
+        # Clear first run output
+        capsys.readouterr()
+
+        # Second run
+        rc = decay_engine.run_init(args)
+        assert rc == 0
+        captured = capsys.readouterr()
+
+        assert "references/ already exists" in captured.out
+        assert "_index.md already exists" in captured.out
+        assert "db_config.ini already exists" in captured.out
+
+    def test_init_partial_state(self, tmp_path, monkeypatch, capsys):
+        """references/ exists but _index.md does not -> creates _index.md only."""
+        import decay_engine
+
+        refs_dir = tmp_path / "references"
+        refs_dir.mkdir()
+        config_path = tmp_path / "db_config.ini"
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", refs_dir)
+        monkeypatch.setattr(decay_engine, "DB_CONFIG_PATH", config_path)
+
+        args = SimpleNamespace(command="init")
+        rc = decay_engine.run_init(args)
+        assert rc == 0
+
+        captured = capsys.readouterr()
+        assert "references/ already exists" in captured.out
+        assert "Created _index.md" in captured.out
+        # _index.md was actually created
+        assert (refs_dir / "_index.md").exists()

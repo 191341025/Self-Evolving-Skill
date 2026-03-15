@@ -40,7 +40,7 @@ skill-name/
 │   │   ├── formulas.py             # 原子公式
 │   │   ├── models.py               # 组合模型 + 配置
 │   │   └── parser.py               # 衰减标签解析器
-│   ├── decay_engine.py             # 置信度扫描 / 反馈 / 重置 CLI
+│   ├── decay_engine.py             # CLI：init / scan / feedback / reset / inject / search
 │   └── *.py                        # 领域专用工具
 └── references/                     # 活的知识库（AI 维护）
     ├── _index.md                   # 路由表（<40行）
@@ -145,7 +145,7 @@ scripts/
 │   ├── formulas.py     ← 原子公式（指数衰减、贝叶斯因子）
 │   ├── models.py       ← 组合模型（置信度计算、分级分类）
 │   └── parser.py       ← 衰减标签 I/O（读写 markdown 标签）
-└── decay_engine.py     ← CLI 入口（scan / feedback / reset）
+└── decay_engine.py     ← CLI 入口（init / scan / search / feedback / reset / inject / invalidate）
 ```
 
 公式在 Python 中可测试、可组合、可扩展，SKILL.md 保持精简。
@@ -357,7 +357,7 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 |------|------|------|
 | Skill 定义 | `SKILL.md` | frontmatter（触发条件）+ body（工具选择、五道门协议、扩展规则） |
 | 计算层 | `scripts/core/` | 置信度衰减公式、组合模型、标签解析器 |
-| 衰减引擎 | `scripts/decay_engine.py` | scan / feedback / reset CLI |
+| 衰减引擎 | `scripts/decay_engine.py` | CLI：init / scan / search / feedback / reset / inject / invalidate（7 个子命令） |
 | 执行工具 | `scripts/` | 三个只读工具：数据查询、结构获取、元数据索引 |
 | 知识路由 | `references/_index.md` | 路由表 |
 | 领域知识 | `references/*.md` | 带衰减元数据标签的活知识条目 |
@@ -391,13 +391,14 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
    问自己：这个领域的知识会随使用增长吗？增长有上限吗？
    如果两个答案都是"是"，适合用本模式。
 
-2. 创建目录结构
+2. 创建目录结构并初始化
    skill-name/
    ├── SKILL.md
    ├── scripts/
    │   └── core/            计算层（衰减公式、模型、标签解析）
    └── references/
        └── _index.md
+   运行 `python decay_engine.py init` 自动创建 references/、_index.md 和 db_config.ini。
 
 3. 编写 SKILL.md
    - frontmatter: 触发条件 + 行为准则

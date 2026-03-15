@@ -42,7 +42,7 @@ skill-name/
 │   │   ├── formulas.py             # Atomic formulas
 │   │   ├── models.py               # Composite models + config
 │   │   └── parser.py               # Decay tag parser
-│   ├── decay_engine.py             # Confidence scan / feedback / reset CLI
+│   ├── decay_engine.py             # CLI: init / scan / feedback / reset / inject / search
 │   └── *.py                        # Domain-specific tools
 └── references/                     # Living knowledge base (AI-maintained)
     ├── _index.md                   # Routing table (<40 lines)
@@ -138,7 +138,7 @@ scripts/
 │   ├── formulas.py     <- Atomic formulas (exponential decay, Bayesian factor)
 │   ├── models.py       <- Composite models (confidence calculation, classification)
 │   └── parser.py       <- Decay tag I/O (read/write markdown tags)
-└── decay_engine.py     <- CLI entry point (scan / feedback / reset)
+└── decay_engine.py     <- CLI entry point (init / scan / search / feedback / reset / inject / invalidate)
 ```
 
 This separation means formulas can grow in complexity without bloating SKILL.md, and every formula is unit-testable.
@@ -319,7 +319,7 @@ A Self-Evolving Skill for MySQL database investigation, demonstrating:
 |-----------|------|-------------|
 | Skill definition | `SKILL.md` | frontmatter (triggers) + body (tool selection, Five-Gate protocol, scaling rules) |
 | Computation layer | `scripts/core/` | Confidence decay formulas, models, and tag parser |
-| Decay engine | `scripts/decay_engine.py` | CLI for scan / feedback / reset operations |
+| Decay engine | `scripts/decay_engine.py` | CLI: init, scan, search, feedback, reset, inject, invalidate (7 subcommands) |
 | Execution tools | `scripts/` | Read-only tools: data query, structure fetch, metadata index |
 | Knowledge routing | `references/_index.md` | Routing table |
 | Domain knowledge | `references/*.md` | Living knowledge entries with decay metadata tags |
@@ -355,13 +355,14 @@ Each experiment includes full evolution logs, Five-Gate decision records, qualit
    Ask: Will knowledge grow through use? Does growth have a ceiling?
    If both yes → proceed.
 
-2. Create directory structure
+2. Create directory structure and bootstrap
    skill-name/
    ├── SKILL.md
    ├── scripts/
    │   └── core/              # Computation layer (decay model)
    └── references/
        └── _index.md
+   Run `python decay_engine.py init` to scaffold references/, _index.md, and db_config.ini.
 
 3. Write SKILL.md
    - frontmatter: trigger conditions + behavioral guidelines

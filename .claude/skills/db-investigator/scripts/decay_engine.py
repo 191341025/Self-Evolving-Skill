@@ -40,6 +40,9 @@ from core.formulas import days_since
 # Directory where reference knowledge files are stored
 REFERENCES_DIR = Path(__file__).resolve().parent.parent / "references"
 
+# Path to the database configuration file
+DB_CONFIG_PATH = Path(__file__).resolve().parent / "db_config.ini"
+
 # Short display names for knowledge types
 TYPE_SHORT: dict[str, str] = {
     "schema":          "schema",
@@ -416,6 +419,64 @@ def run_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_init(_args: argparse.Namespace) -> int:
+    """Execute the init subcommand.
+
+    Bootstraps the skill for first-time use by creating the references/
+    directory, _index.md template, and db_config.ini template if they do
+    not already exist.
+
+    Returns:
+        Exit code: 0 (always succeeds).
+    """
+    # 1. references/ directory
+    if not REFERENCES_DIR.exists():
+        REFERENCES_DIR.mkdir(parents=True)
+        print("[init] \u2713 Created references/")
+    else:
+        print("[init] references/ already exists")
+
+    # 2. references/_index.md
+    index_path = REFERENCES_DIR / "_index.md"
+    if not index_path.exists():
+        index_path.write_text(
+            "# Domain Knowledge Index\n"
+            "\n"
+            "> \u8def\u7531\u8868\u3002\u5148\u8bfb\u6b64\u6587\u4ef6\uff0c\u518d\u6309\u9700\u52a0\u8f7d\u5bf9\u5e94\u4e3b\u9898\u6587\u4ef6\u3002\n"
+            "\n"
+            "| Topic File | Summary | When to Load |\n"
+            "|-----------|---------|-------------|\n",
+            encoding="utf-8",
+        )
+        print("[init] \u2713 Created _index.md")
+    else:
+        print("[init] _index.md already exists")
+
+    # 3. db_config.ini
+    if not DB_CONFIG_PATH.exists():
+        DB_CONFIG_PATH.write_text(
+            "[database]\n"
+            "host = localhost\n"
+            "port = 3306\n"
+            "user = root\n"
+            "password = \n"
+            "charset = utf8\n"
+            "\n"
+            "[target]\n"
+            "database = \n"
+            "\n"
+            "[output]\n"
+            "base_path = ../db_schemas/\n",
+            encoding="utf-8",
+        )
+        print("[init] \u2713 Created db_config.ini template \u2014 edit with your database credentials")
+    else:
+        print("[init] db_config.ini already exists")
+
+    print("[init] Ready. Configure db_config.ini, then start investigating.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with subcommands."""
     ap = argparse.ArgumentParser(
@@ -536,6 +597,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="1-based line number of the decay tag",
     )
 
+    # init subcommand
+    subparsers.add_parser(
+        "init",
+        help="Initialize skill: create references/ directory, _index.md template, and db_config.ini template.",
+    )
+
     # search subcommand
     sp_search = subparsers.add_parser(
         "search",
@@ -594,6 +661,9 @@ def main() -> int:
 
     if args.command == "invalidate":
         return run_invalidate(args)
+
+    if args.command == "init":
+        return run_init(args)
 
     if args.command == "search":
         return run_search(args)
