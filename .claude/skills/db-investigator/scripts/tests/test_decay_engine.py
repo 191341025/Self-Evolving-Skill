@@ -467,6 +467,73 @@ class TestInjectWithEntities:
         assert "entities" in result.stdout
 
 
+class TestInjectTargetValidation:
+    """Tests for --target path stripping and .md validation."""
+
+    def test_inject_strips_path_from_target(self, tmp_path, monkeypatch, capsys):
+        """Target with path separators is auto-corrected to basename."""
+        import decay_engine
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", tmp_path)
+
+        args = SimpleNamespace(
+            command="inject",
+            type="schema",
+            content="test content",
+            target=".claude/skills/db-investigator/references/schema_map.md",
+            entities=None,
+        )
+        rc = decay_engine.run_inject(args)
+        assert rc == 0
+
+        # Written to correct file (basename only)
+        assert (tmp_path / "schema_map.md").exists()
+        # NOT written to nested wrong path
+        assert not (tmp_path / ".claude").exists()
+        # Warning on stderr
+        captured = capsys.readouterr()
+        assert "Warning: stripped path" in captured.err
+
+    def test_inject_rejects_non_md_target(self, tmp_path, monkeypatch, capsys):
+        """Target without .md extension is rejected."""
+        import decay_engine
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", tmp_path)
+
+        args = SimpleNamespace(
+            command="inject",
+            type="schema",
+            content="test content",
+            target="no_extension",
+            entities=None,
+        )
+        rc = decay_engine.run_inject(args)
+        assert rc == 1
+
+        captured = capsys.readouterr()
+        assert "must be a .md filename" in captured.err
+
+    def test_inject_normal_filename_unchanged(self, tmp_path, monkeypatch, capsys):
+        """Normal filename (no path) passes without warning."""
+        import decay_engine
+
+        monkeypatch.setattr(decay_engine, "REFERENCES_DIR", tmp_path)
+
+        args = SimpleNamespace(
+            command="inject",
+            type="schema",
+            content="normal content",
+            target="schema_map.md",
+            entities=None,
+        )
+        rc = decay_engine.run_inject(args)
+        assert rc == 0
+
+        assert (tmp_path / "schema_map.md").exists()
+        captured = capsys.readouterr()
+        assert "Warning" not in captured.err
+
+
 # ---------- search subcommand ----------
 
 class TestSearchCommand:

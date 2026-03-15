@@ -254,6 +254,24 @@ def run_reset(args: argparse.Namespace) -> int:
 
 def run_inject(args: argparse.Namespace) -> int:
     """Handle the 'inject' subcommand."""
+    # Defensive: strip path components — target must be a filename only
+    basename = Path(args.target).name
+    if basename != args.target:
+        print(
+            f"[inject] Warning: stripped path from --target, "
+            f"using '{basename}'",
+            file=sys.stderr,
+        )
+        args.target = basename
+
+    if not args.target.endswith(".md"):
+        print(
+            f"Error: --target must be a .md filename, "
+            f"got '{args.target}'",
+            file=sys.stderr,
+        )
+        return 1
+
     target_path = REFERENCES_DIR / args.target
     entities = None
     if hasattr(args, "entities") and args.entities:
@@ -492,7 +510,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp_inject.add_argument(
         "--target",
         required=True,
-        help="Target filename in references/",
+        help="Target filename in references/ (filename only, no path)",
     )
     sp_inject.add_argument(
         "--entities",

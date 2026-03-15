@@ -91,7 +91,10 @@ Gate 4 — FRESHNESS (feedback): After operations using knowledge
 
   Soft signals (weight=0.3):
     → Gate 2 ALIGNMENT correction (β+0.3 on corrected entry)
-    → Empty result on enum/status value query
+    → Empty result on enum/status value query:
+      - Value came from existing knowledge → soft FAILURE (knowledge may be wrong)
+      - Value was user-supplied and NOT in known enum → soft SUCCESS (confirms completeness)
+      - Value source unclear → do NOT record feedback
     → User explicit confirmation of result correctness
     Command: python $S/decay_engine.py feedback --file <f> --line <n> --result success|failure --weight 0.3
 
