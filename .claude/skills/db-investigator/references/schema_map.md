@@ -13,7 +13,3 @@
 <!-- decay: type=schema confirmed=2026-03-14 C0=1.0 alpha=0 beta=0 -->
 <!-- entities: t_building, t_floor -->
 - Hierarchy: t_building -> t_floor -> t_room. t_floor.building_id = t_building.id (many-to-one). t_room.floor = t_floor.id (many-to-one). t_floor: id(PK varchar50), name(e.g. 3F), park_yard(dict), building_id(FK to t_building), floor_no(int), capacity(int), status. No index on building_id.
-
-<!-- decay: type=schema confirmed=2026-03-15 C0=1.0 -->
-<!-- entities: t_room, t_building -->
-- t_room has building_id column

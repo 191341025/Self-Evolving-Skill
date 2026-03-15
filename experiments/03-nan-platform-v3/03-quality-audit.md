@@ -146,4 +146,39 @@ Dense entries like schema_map:5 (300+ characters on one line) become hard to aud
 | Acceptance rate | ~36% | ~24% | ~42% |
 | Gate 2 corrections | 2 | 1 | 1 (rejection, not correction) |
 | New capabilities validated | Five-Gate protocol | Decay model, TRUST/VERIFY/REVALIDATE | Entities, search, hard/soft signals, invalidate/reset |
-| Bugs found | — | — | inject path concatenation bug |
+| Bugs found | — | — | inject path concatenation bug, soft signal ambiguity |
+
+---
+
+## Patch Verification (2026-03-15)
+
+After R5, two bugs were fixed and verified via targeted replay without running a full v4 experiment.
+
+### PV-1: inject --target Path Stripping
+
+**Bug:** `--target` with relative path silently wrote to nested wrong location.
+**Fix:** Auto-strip to basename + warn on stderr; reject non-.md targets.
+
+| Test | Input | Result |
+|------|-------|--------|
+| Path stripping | `--target .claude/skills/.../schema_map.md` | Warning on stderr, wrote to correct `schema_map.md`, no nested dir created |
+| .md validation | `--target no_extension` | Exit code 1, error message on stderr |
+
+**Unit tests:** 3 new tests added to `TestInjectTargetValidation`, 44/44 total passing.
+
+### PV-2: Soft Signal Semantic Refinement
+
+**Bug:** "Empty result on enum query -> soft failure" punished correct knowledge when user queried a non-existent value.
+**Fix:** Refined SKILL.md rule to distinguish value source: user-supplied value not in known enum -> soft SUCCESS (confirms completeness).
+
+| Step | Old Rule (v3 R4) | New Rule (PV-2) |
+|------|-------------------|-----------------|
+| Query `quad_room` | cnt=0 | cnt=0 |
+| Decision | soft FAILURE (β+0.3) | soft SUCCESS (α+0.3) |
+| Effect on knowledge | Penalized correct enum | Rewarded correct enum |
+
+**End-to-end:** Real SQL query (nan_platform) returned 0 rows -> LLM applied new rule -> `feedback --result success --weight 0.3` -> α increased (not β).
+
+### Patch Verification Summary
+
+Both fixes verified. references/ restored to R5 state after replay (PV artifacts not persisted).
