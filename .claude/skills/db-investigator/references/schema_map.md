@@ -21,3 +21,7 @@
 <!-- decay: type=schema confirmed=2026-03-15 C0=1.0 -->
 <!-- entities: t_room, t_building -->
 - t_room has building_id column
+
+<!-- decay: type=schema confirmed=2026-03-15 C0=1.0 -->
+<!-- entities: t_room, t_building -->
+- t_room has building_id column

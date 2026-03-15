@@ -58,17 +58,24 @@ def load_config():
 
 def run_query(config, database, sql, limit):
     db_name = database or config.get("target", "database")
-    conn = pymysql.connect(
-        host=config.get("database", "host"),
-        port=config.getint("database", "port"),
-        user=config.get("database", "user"),
-        password=config.get("database", "password"),
-        database=db_name,
-        charset=config.get("database", "charset"),
-        cursorclass=pymysql.cursors.DictCursor,
-        connect_timeout=10,
-        read_timeout=30,
-    )
+    try:
+        conn = pymysql.connect(
+            host=config.get("database", "host"),
+            port=config.getint("database", "port"),
+            user=config.get("database", "user"),
+            password=config.get("database", "password"),
+            database=db_name,
+            charset=config.get("database", "charset"),
+            cursorclass=pymysql.cursors.DictCursor,
+            connect_timeout=10,
+            read_timeout=30,
+        )
+    except pymysql.Error as e:
+        print(f"Connection error: {e}")
+        errno = e.args[0] if e.args else 0
+        msg = e.args[1] if len(e.args) > 1 else str(e)
+        print(f"\n[QUERY_FAIL] error={errno} message={msg}")
+        return
 
     try:
         with conn.cursor() as cur:
@@ -79,6 +86,7 @@ def run_query(config, database, sql, limit):
 
             if not rows:
                 print(f"[{db_name}] No results.")
+                print(f"\n[QUERY_OK] rows=0")
                 return
 
             # Print header
@@ -110,6 +118,13 @@ def run_query(config, database, sql, limit):
             if total > len(rows):
                 print(f"\n... ({total - len(rows)} more rows not shown, use --limit to increase)")
 
+            print(f"\n[QUERY_OK] rows={total}")
+
+    except pymysql.Error as e:
+        print(f"Query error: {e}")
+        errno = e.args[0] if e.args else 0
+        msg = e.args[1] if len(e.args) > 1 else str(e)
+        print(f"\n[QUERY_FAIL] error={errno} message={msg}")
     finally:
         conn.close()
 
