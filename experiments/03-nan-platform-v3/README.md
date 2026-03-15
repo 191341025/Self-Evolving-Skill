@@ -13,7 +13,7 @@
 | Data Scale | 29 tables, ~95K rows, 590MB |
 | Skill Used | db-investigator (Phase 5 enhancements) |
 | Execution Date | 2026-03-14 |
-| Rounds | 5 rounds, 17 tasks (exploration -> queries -> dedup/contradiction -> soft signals -> comprehensive) |
+| Rounds | 5+1 rounds, 17 tasks + R6 time decay spot check |
 | Starting State | references/ fully cleared — from zero |
 
 ## Experiment Objective
@@ -69,6 +69,7 @@ Each subdirectory is a full copy of `references/` at the end of that round:
 | `R3-dedup-contradiction/` | After Round 3 | +1 entry (no-index warning); 1 SKIP, 1 REJECT |
 | `R4-soft-signal-correction/` | After Round 4 | No new entries; soft signal + invalidate/reset tested |
 | `R5-comprehensive/` | After Round 5 | Final state; search-driven retrieval validated |
+| `R6-time-decay/` | Day 2 (2026-03-15) | Time decay spot check: natural decay + feedback refresh + projections |
 
 **Quick diff example** (after local clone):
 ```bash

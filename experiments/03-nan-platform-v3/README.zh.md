@@ -13,7 +13,7 @@
 | 数据规模 | 29 表，~95K 行，590MB |
 | 使用 Skill | db-investigator（Phase 5 增强版） |
 | 执行日期 | 2026-03-14 |
-| 轮次 | 5 轮，17 个任务（探索 → 查询 → 去重/矛盾 → 软信号 → 综合） |
+| 轮次 | 5+1 轮，17 个任务 + R6 时间衰减定点验证 |
 | 起始状态 | references/ 全部清空——从零开始 |
 
 ## 实验目的
@@ -69,6 +69,7 @@
 | `R3-dedup-contradiction/` | Round 3 后 | +1 条（无索引警告）；1 次 SKIP, 1 次 REJECT |
 | `R4-soft-signal-correction/` | Round 4 后 | 无新增；软信号 + invalidate/reset 测试 |
 | `R5-comprehensive/` | Round 5 后 | 最终状态；search 驱动检索验证 |
+| `R6-time-decay/` | 第 2 天 (2026-03-15) | 时间衰减定点验证：自然衰减 + 反馈刷新 + 投影 |
 
 **快速对比示例**（本地 clone 后）：
 ```bash

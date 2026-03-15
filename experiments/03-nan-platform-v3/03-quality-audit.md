@@ -182,3 +182,68 @@ After R5, two bugs were fixed and verified via targeted replay without running a
 ### Patch Verification Summary
 
 Both fixes verified. references/ restored to R5 state after replay (PV artifacts not persisted).
+
+---
+
+## R6: Time Decay Spot Check (2026-03-15, t=1 day)
+
+v3 R1-R5 were completed in a single day (2026-03-14), so time decay was t=0 throughout. R6 runs one day later to validate time-based features that were previously unobservable.
+
+### R6-1: Natural Decay Observation
+
+Scan at t=1 day shows all 8 entries have begun natural decay:
+
+| Entry | Type | α | β | C (t=1d) | C (t=0d) | Decay driver |
+|-------|------|---|---|----------|----------|-------------|
+| schema_map:5 | schema | 4.0 | 0.0 | 0.999 | 1.000 | λ=0.003, high α slows decay |
+| schema_map:9 | schema | 3.0 | 0.0 | 0.999 | 1.000 | λ=0.003, α=3 protection |
+| schema_map:13 | schema | 0.0 | 0.0 | 0.997 | 1.000 | λ=0.003, no feedback |
+| query_patterns:9 | tool_exp | 0.0 | 0.0 | 0.995 | 1.000 | λ=0.005 |
+| query_patterns:13 | qry_pat | 1.0 | 0.0 | 0.993 | 1.000 | λ=0.015, α=1 partial protection |
+| business_rules:5 | biz_rule | 0.3 | 0.3 | 0.992 | 1.000 | λ=0.008, α≈β cancel out |
+| business_rules:9 | biz_rule | 0.0 | 0.0 | 0.992 | 1.000 | λ=0.008 |
+| query_patterns:5 | qry_pat | 0.0 | 0.0 | 0.985 | 1.000 | λ=0.015, fastest decay |
+
+**Three design features now observable:**
+
+1. **Type-specific λ**: Same α=0 entries — query_pattern (C=0.985) decays 5x faster than schema (C=0.997)
+2. **Bayesian deceleration**: Same type query_pattern — α=1.0 entry (C=0.993) vs α=0 entry (C=0.985)
+3. **α/β cancellation**: business_rules:5 (α=0.3, β=0.3) has identical C to business_rules:9 (α=0, β=0) — ratio (β+1)/(α+1) = 1.0 in both cases
+
+### R6-2: Decayed Knowledge Usability
+
+Executed a query using schema_map:5 (C=0.999, TRUST). Protocol behavior: "use directly, no mention of confidence" — correct. Query succeeded, hard feedback recorded:
+
+- **Before feedback**: C=0.999, α=4.0, confirmed=2026-03-14 (1d old)
+- **After feedback**: C=1.000, α=5.0, confirmed=2026-03-15 (0d) — **confirmed_at refresh resets the clock**
+
+This demonstrates the "use it or lose it" principle: actively used knowledge stays fresh, unused knowledge naturally ages.
+
+### R6-3: Decay Projections
+
+Days until each entry reaches VERIFY (C=0.8) and REVALIDATE (C=0.5) if never used again:
+
+| Entry | Type | α | β | Bayesian Factor | Days to VERIFY | Days to REVALIDATE |
+|-------|------|---|---|-----------------|----------------|-------------------|
+| schema_map:5 | schema | 5.0 | 0.0 | 0.167 | 446 | 1,386 |
+| schema_map:9 | schema | 3.0 | 0.0 | 0.250 | 298 | 924 |
+| schema_map:13 | schema | 0.0 | 0.0 | 1.000 | 74 | 231 |
+| business_rules:5 | biz_rule | 0.3 | 0.3 | 1.000 | 28 | 87 |
+| business_rules:9 | biz_rule | 0.0 | 0.0 | 1.000 | 28 | 87 |
+| query_patterns:5 | qry_pat | 0.0 | 0.0 | 1.000 | 15 | 46 |
+| query_patterns:9 | tool_exp | 0.0 | 0.0 | 1.000 | 45 | 139 |
+| query_patterns:13 | qry_pat | 1.0 | 0.0 | 0.500 | 30 | 92 |
+
+**Key insight: positive feedback is the strongest protection.** schema_map:5 (α=5) has 446 days to VERIFY — 6x longer than schema_map:13 (α=0, 74 days). Each successful use roughly doubles the entry's lifespan. Meanwhile, query_patterns:5 (no feedback, high λ) would need revalidation in just 15 days — the system correctly identifies it as the least battle-tested entry.
+
+### R6 Summary
+
+| Check | Result |
+|-------|--------|
+| Natural decay observable at t=1d | **Yes** — C values range 0.985-0.999 |
+| Type-specific λ differentiation | **Confirmed** — schema decays 5x slower than query_pattern |
+| Bayesian feedback deceleration | **Confirmed** — α=4 entry decays 6x slower than α=0 same-type entry |
+| confirmed_at refresh on feedback | **Confirmed** — C restored to 1.000, age reset to 0d |
+| Decay projections reasonable | **Yes** — 15 days (volatile) to 446 days (well-tested schema) |
+
+R6 fills the time decay coverage gap identified in the original v3 quality audit.

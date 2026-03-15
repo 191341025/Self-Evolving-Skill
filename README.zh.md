@@ -375,7 +375,7 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
 |------|------|------|---------|
 | [#01 nan-platform v1](experiments/01-nan-platform/) | 智能楼宇管理 (29表) | 5轮 | 拒绝率 63.6%，增量 +75→+1 收敛，Gate 2 自我纠错 2 次 |
 | [#01 nan-platform v2](experiments/01-nan-platform-v2/) | 同领域，Gate 4 验证 | 5轮 | 置信度衰减模型验证通过，25/25 任务完成，贝叶斯反馈机制验证 |
-| [#03 nan-platform v3](experiments/03-nan-platform-v3/) | 同领域，Phase 5 验证 | 5轮 | 6/6 验证点通过，entities+search 实现精确 Gate 2/3，硬/软信号验证通过，发现 1 个严重 Bug（inject 路径拼接） |
+| [#03 nan-platform v3](experiments/03-nan-platform-v3/) | 同领域，Phase 5 验证 | 5+1轮 | 6/6 验证点通过，entities+search 实现精确 Gate 2/3，硬/软信号验证通过，R6 时间衰减已确认（类型特异 λ + 贝叶斯减缓在 t=1d 可观测） |
 
 每个实验包含完整的进化日志、五道门决策记录、质量审计报告和每轮知识快照，可逐步 diff 观察 Skill 的知识增长过程。
 
