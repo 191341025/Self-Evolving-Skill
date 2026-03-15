@@ -1,7 +1,7 @@
 # 计算层架构设计：从 Prompt 到 Tool
 
 > Self-Evolving Skill 设计文档
-> 状态：已确认（已实现，143 个 pytest 用例通过，含 Phase 5 扩展）
+> 状态：已确认（已实现，146 个 pytest 用例通过，含 Phase 5 扩展 + v3 补丁）
 > 前置依赖：`bayesian-feedback-design.md`（反馈机制）、`decay-model-notes.md`（公式推导）
 
 ---
@@ -241,7 +241,7 @@ fetch_index.py           独立运行
 - **5B w_soft 软信号加权**：alpha/beta int→float / increment_feedback(weight) / feedback --weight 0.3 / success 刷新 confirmed_at
 - **5C C(t) 检索过滤器**：search --level TRUST|VERIFY|REVALIDATE / search --min-confidence
 - **5D SKILL.md 步骤式指令重写**：Gate 2/3 步骤化、知识检索用 search 驱动、硬/软信号区分
-- 143 个 pytest 用例全部通过（新增 44 个）
+- 146 个 pytest 用例全部通过（Phase 5 新增 44 个 + v3 补丁 inject 路径校验 3 个）
 - 详见：`research/design/formula-opportunity-analysis.md`、`research/design/cli-reference.md`
 
 ---

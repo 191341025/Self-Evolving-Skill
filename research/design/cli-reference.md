@@ -1,7 +1,7 @@
 # decay_engine.py CLI 参考
 
 > Self-Evolving Skill 设计文档
-> 状态：已实现（143 个 pytest 用例通过）
+> 状态：已实现（146 个 pytest 用例通过，含 v3 补丁 inject 路径校验 +3）
 > 关联文档：`computation-layer-design.md`（分层架构）、`formula-opportunity-analysis.md`（设计决策来源）
 
 ---
@@ -207,7 +207,7 @@ python decay_engine.py inject --type <type> --content "<text>" --target <filenam
 |------|------|------|------|
 | --type | string | 是 | 知识类型（6 种之一） |
 | --content | string | 是 | 知识文本（单行） |
-| --target | string | 是 | 目标文件名（在 references/ 下） |
+| --target | string | 是 | 目标文件名（仅文件名，不含路径） |
 | --entities | string | 否 | 逗号分隔的实体名 |
 
 **写入格式**：
@@ -223,7 +223,12 @@ python decay_engine.py inject --type <type> --content "<text>" --target <filenam
 - entities 标签仅在 --entities 参数指定时写入
 - 返回 decay 标签的行号
 
-**退出码**：0 = 成功。
+**退出码**：0 = 成功，1 = --target 非 .md 文件。
+
+**--target 校验**（v3 补丁，2026-03-15）：
+- 如果 --target 含路径分隔符（如 `.claude/.../schema_map.md`），自动剥离为文件名（`schema_map.md`），stderr 输出警告
+- 如果 --target 不以 `.md` 结尾，返回 exit code 1
+- 背景：v3 实验中发现传入相对路径时会静默写入错误嵌套位置
 
 **注意**：inject 只做 Gate 4-5（写入），Gate 1-3（VALUE/ALIGNMENT/REDUNDANCY）由 LLM 在调用前判断。
 

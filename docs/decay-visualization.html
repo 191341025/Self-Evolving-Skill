@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confidence Decay Model — Self-Evolving Skill</title>
+<style>
+  :root {
+    --trust: rgba(34, 197, 94, 0.10);
+    --verify: rgba(234, 179, 8, 0.10);
+    --revalidate: rgba(239, 68, 68, 0.10);
+    --trust-border: rgba(34, 197, 94, 0.5);
+    --verify-border: rgba(234, 179, 8, 0.5);
+    --revalidate-border: rgba(239, 68, 68, 0.5);
+    --curve: #3b82f6;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .container {
+    max-width: 840px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+  header .subtitle {
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .formula-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-size: 1.15rem;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    letter-spacing: 0.02em;
+  }
+  .formula-box .var { font-style: italic; }
+  .formula-box .sub { font-size: 0.75em; vertical-align: sub; }
+  .formula-box .note {
+    display: block;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    font-style: normal;
+  }
+
+  .chart-wrapper {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    height: 400px;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+  }
+  .metric-card .label {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .metric-card .value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .metric-card .unit {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .controls {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .controls h2 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .control-row:last-child { margin-bottom: 0; }
+  .control-row .ctrl-label {
+    flex: 0 0 200px;
+    font-size: 0.85rem;
+  }
+  .control-row .ctrl-label .en { font-weight: 500; }
+  .control-row .ctrl-label .zh { color: var(--muted); font-size: 0.8rem; }
+  .control-row input[type="range"] {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 3px;
+    outline: none;
+  }
+  .control-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--curve);
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .control-row select {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background: white;
+    color: var(--text);
+  }
+  .control-row .ctrl-value {
+    flex: 0 0 60px;
+    text-align: right;
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.8rem;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  footer {
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--muted);
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+  footer a { color: var(--curve); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 600px) {
+    .control-row { flex-wrap: wrap; }
+    .control-row .ctrl-label { flex: 0 0 100%; }
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .chart-wrapper { height: 300px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Confidence Decay Model</h1>
+    <div class="subtitle">Self-Evolving Skill — Gate 4 Freshness Visualization</div>
+  </header>
+
+  <div class="formula-box">
+    <span class="var">C</span>(<span class="var">t</span>) =
+    <span class="var">C</span><span class="sub">0</span> &times;
+    <span class="var">e</span><sup>&minus;<span class="var">&lambda;</span><span class="sub">base</span>
+    &times; (<span class="var">&beta;</span>+1)/(<span class="var">&alpha;</span>+1)
+    &times; <span class="var">t</span></sup>
+    <span class="note">
+      &alpha; = positive feedback (slows decay) &nbsp;|&nbsp; &beta; = negative feedback (accelerates decay)
+      &nbsp;|&nbsp; t = days since confirmed
+    </span>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background: rgba(34,197,94,0.35);"></div>
+      <span>TRUST / 信任 (C &ge; 0.8)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background: rgba(234,179,8,0.35);"></div>
+      <span>VERIFY / 待验 (0.5 &le; C &lt; 0.8)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background: rgba(239,68,68,0.35);"></div>
+      <span>REVALIDATE / 重验 (C &lt; 0.5)</span>
+    </div>
+  </div>
+
+  <div class="chart-wrapper">
+    <canvas id="decayChart"></canvas>
+  </div>
+
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="label">Effective &lambda; / 有效衰减率</div>
+      <div class="value" id="mLambda">0.003</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Bayesian Factor / 贝叶斯因子</div>
+      <div class="value" id="mBayes">1.000</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Half-life / 半衰期</div>
+      <div class="value" id="mHalf">231 <span class="unit">days</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Days to VERIFY / 进入待验区</div>
+      <div class="value" id="mVerify">74 <span class="unit">days</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Days to REVALIDATE / 进入重验区</div>
+      <div class="value" id="mReval">231 <span class="unit">days</span></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <h2>Parameters / 参数</h2>
+    <div class="control-row">
+      <div class="ctrl-label">
+        <span class="en">Knowledge Type</span><br>
+        <span class="zh">知识类型</span>
+      </div>
+      <select id="ctrlType">
+        <option value="0.003">schema / 表结构 (&lambda;=0.003)</option>
+        <option value="0.005">tool_experience / 工具经验 (&lambda;=0.005)</option>
+        <option value="0.008">business_rule / 业务规则 (&lambda;=0.008)</option>
+        <option value="0.015">query_pattern / 查询模板 (&lambda;=0.015)</option>
+        <option value="0.035">data_range / 数据范围 (&lambda;=0.035)</option>
+        <option value="0.050">data_snapshot / 数据快照 (&lambda;=0.050)</option>
+      </select>
+    </div>
+    <div class="control-row">
+      <div class="ctrl-label">
+        <span class="en">&alpha; (positive feedback)</span><br>
+        <span class="zh">正反馈次数</span>
+      </div>
+      <input type="range" id="ctrlAlpha" min="0" max="20" step="1" value="0">
+      <div class="ctrl-value" id="valAlpha">0</div>
+    </div>
+    <div class="control-row">
+      <div class="ctrl-label">
+        <span class="en">&beta; (negative feedback)</span><br>
+        <span class="zh">负反馈次数</span>
+      </div>
+      <input type="range" id="ctrlBeta" min="0" max="20" step="1" value="0">
+      <div class="ctrl-value" id="valBeta">0</div>
+    </div>
+    <div class="control-row">
+      <div class="ctrl-label">
+        <span class="en">C<sub>0</sub> (initial confidence)</span><br>
+        <span class="zh">初始置信度</span>
+      </div>
+      <input type="range" id="ctrlC0" min="0.1" max="1.0" step="0.1" value="1.0">
+      <div class="ctrl-value" id="valC0">1.0</div>
+    </div>
+  </div>
+
+  <footer>
+    <a href="https://github.com/Tiansing/Self-Evolving-Skill">Self-Evolving Skill</a>
+    &mdash; Five-Gate Governance Protocol
+    &mdash; Formula: <code>C(t) = C&sub;0; &times; e<sup>&minus;&lambda;eff &times; t</sup></code>
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // --- DOM refs ---
+  const elType  = document.getElementById('ctrlType');
+  const elAlpha = document.getElementById('ctrlAlpha');
+  const elBeta  = document.getElementById('ctrlBeta');
+  const elC0    = document.getElementById('ctrlC0');
+  const vAlpha  = document.getElementById('valAlpha');
+  const vBeta   = document.getElementById('valBeta');
+  const vC0     = document.getElementById('valC0');
+
+  // --- Compute ---
+  function bayesianFactor(a, b) { return (b + 1) / (a + 1); }
+  function effectiveLambda(lb, a, b) { return lb * bayesianFactor(a, b); }
+  function confidence(t, lb, a, b, c0) {
+    return c0 * Math.exp(-effectiveLambda(lb, a, b) * t);
+  }
+
+  function computeCurve(lb, a, b, c0, maxDays) {
+    const pts = [];
+    for (let t = 0; t <= maxDays; t++) {
+      pts.push({ x: t, y: confidence(t, lb, a, b, c0) });
+    }
+    return pts;
+  }
+
+  function daysTo(threshold, lb, a, b, c0) {
+    if (c0 <= threshold) return 0;
+    const le = effectiveLambda(lb, a, b);
+    if (le <= 0) return Infinity;
+    return -Math.log(threshold / c0) / le;
+  }
+
+  // --- Adaptive x-axis: show enough to reach REVALIDATE or 365, whichever is smaller ---
+  function chooseMaxDays(lb, a, b, c0) {
+    const d = daysTo(0.5, lb, a, b, c0);
+    if (!isFinite(d) || d > 730) return 730;
+    return Math.max(Math.ceil(d * 1.2), 30);
+  }
+
+  // --- Chart setup ---
+  const ctx = document.getElementById('decayChart').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'C(t)',
+        data: [],
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+        borderWidth: 2.5,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.1,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Days since confirmed / 距上次确认天数', font: { size: 12 } },
+          min: 0,
+          ticks: { stepSize: 30 },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+        },
+        y: {
+          title: { display: true, text: 'Confidence C(t)', font: { size: 12 } },
+          min: 0,
+          max: 1.05,
+          ticks: {
+            stepSize: 0.1,
+            callback: v => v <= 1 ? v.toFixed(1) : '',
+          },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => 't = ' + items[0].parsed.x + ' days',
+            label: item => 'C = ' + item.parsed.y.toFixed(4),
+          }
+        },
+        annotation: {
+          annotations: {
+            trustZone: {
+              type: 'box', yMin: 0.8, yMax: 1.05,
+              backgroundColor: 'rgba(34, 197, 94, 0.08)',
+              borderWidth: 0,
+            },
+            verifyZone: {
+              type: 'box', yMin: 0.5, yMax: 0.8,
+              backgroundColor: 'rgba(234, 179, 8, 0.08)',
+              borderWidth: 0,
+            },
+            revalZone: {
+              type: 'box', yMin: 0, yMax: 0.5,
+              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+              borderWidth: 0,
+            },
+            trustLine: {
+              type: 'line', yMin: 0.8, yMax: 0.8,
+              borderColor: 'rgba(34, 197, 94, 0.5)',
+              borderWidth: 1, borderDash: [6, 4],
+              label: { display: true, content: 'TRUST 0.8', position: 'start',
+                       font: { size: 10 }, color: 'rgba(34,197,94,0.7)' },
+            },
+            verifyLine: {
+              type: 'line', yMin: 0.5, yMax: 0.5,
+              borderColor: 'rgba(234, 179, 8, 0.5)',
+              borderWidth: 1, borderDash: [6, 4],
+              label: { display: true, content: 'VERIFY 0.5', position: 'start',
+                       font: { size: 10 }, color: 'rgba(234,179,8,0.7)' },
+            },
+          }
+        }
+      }
+    }
+  });
+
+  // --- Update ---
+  function update() {
+    const lb = parseFloat(elType.value);
+    const a  = parseInt(elAlpha.value);
+    const b  = parseInt(elBeta.value);
+    const c0 = parseFloat(elC0.value);
+
+    vAlpha.textContent = a;
+    vBeta.textContent  = b;
+    vC0.textContent    = c0.toFixed(1);
+
+    const maxDays = chooseMaxDays(lb, a, b, c0);
+    const data = computeCurve(lb, a, b, c0, maxDays);
+    chart.data.datasets[0].data = data;
+    chart.options.scales.x.max = maxDays;
+    chart.options.scales.x.ticks.stepSize = maxDays <= 60 ? 5 : maxDays <= 180 ? 15 : 30;
+    chart.update('none');
+
+    // Metrics
+    const le = effectiveLambda(lb, a, b);
+    const bf = bayesianFactor(a, b);
+    const hl = Math.LN2 / le;
+    const dv = daysTo(0.8, lb, a, b, c0);
+    const dr = daysTo(0.5, lb, a, b, c0);
+
+    document.getElementById('mLambda').textContent = le.toFixed(5);
+    document.getElementById('mBayes').textContent = bf.toFixed(3);
+
+    function fmtDays(d) {
+      if (d === 0) return 'Immediate / 即时';
+      if (!isFinite(d) || d > 9999) return '9999+ <span class="unit">days</span>';
+      return Math.round(d) + ' <span class="unit">days</span>';
+    }
+    document.getElementById('mHalf').innerHTML = fmtDays(hl);
+    document.getElementById('mVerify').innerHTML = fmtDays(dv);
+    document.getElementById('mReval').innerHTML = fmtDays(dr);
+  }
+
+  // --- Events ---
+  elType.addEventListener('change', update);
+  elAlpha.addEventListener('input', update);
+  elBeta.addEventListener('input', update);
+  elC0.addEventListener('input', update);
+
+  // Initial render
+  update();
+})();
+</script>
+</body>
+</html>

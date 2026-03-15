@@ -10,6 +10,7 @@
 |---|------|---------|-----------|-------|------|------|---------|
 | 01 | [nan-platform](01-nan-platform/) | 智能楼宇管理 | MySQL · 29表 · 590MB | db-investigator | 5 | ✅ 已完成 | 拒绝率 63.6%，增量收敛 +75→+1 |
 | 01-v2 | [nan-platform-v2](01-nan-platform-v2/) | 同 #01，Gate 4 升级版 | MySQL · 29表 · 590MB | db-investigator | 5 | ✅ 已完成 | 衰减模型验证，接受率 24%，R5 4/4 首次成功 |
+| 03 | [nan-platform-v3](03-nan-platform-v3/) | 同 #01，Phase 5 验证 | MySQL · 29表 · 590MB | db-investigator | 5+1 | ✅ 已完成 | 6/6 验证点通过，entities+search，硬/软信号，R6 时间衰减已确认 |
 | 02 | [telecom-billing](02-telecom-billing/) | 电信计费（脱敏） | MySQL · 大型 | db-investigator | - | 🔧 准备中 | 跨领域可复现性验证 |
 
 ## 每个实验的标准结构
