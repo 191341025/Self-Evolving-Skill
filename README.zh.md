@@ -151,7 +151,7 @@ scripts/
 公式在 Python 中可测试、可组合、可扩展，SKILL.md 保持精简。
 
 > [!TIP]
-> **[交互式衰减模型可视化](https://tiansing.github.io/Self-Evolving-Skill/decay-visualization.html)** — 通过可调参数探索置信度公式 `C(t) = C₀ × e^(-λ × (β+1)/(α+1) × t)`，直观感受知识类型、正/负反馈、时间如何共同影响 TRUST / VERIFY / REVALIDATE 决策。
+> **[交互式衰减模型可视化](https://191341025.github.io/Self-Evolving-Skill/decay-visualization.html)** — 通过可调参数探索置信度公式 `C(t) = C₀ × e^(-λ × (β+1)/(α+1) × t)`，直观感受知识类型、正/负反馈、时间如何共同影响 TRUST / VERIFY / REVALIDATE 决策。
 
 ### 三级加载机制
 

@@ -144,7 +144,7 @@ scripts/
 This separation means formulas can grow in complexity without bloating SKILL.md, and every formula is unit-testable.
 
 > [!TIP]
-> **[Interactive Decay Model Visualization](https://tiansing.github.io/Self-Evolving-Skill/decay-visualization.html)** — Explore the confidence formula `C(t) = C₀ × e^(-λ × (β+1)/(α+1) × t)` with adjustable parameters. See how knowledge type, positive/negative feedback, and time interact to produce TRUST / VERIFY / REVALIDATE decisions.
+> **[Interactive Decay Model Visualization](https://191341025.github.io/Self-Evolving-Skill/decay-visualization.html)** — Explore the confidence formula `C(t) = C₀ × e^(-λ × (β+1)/(α+1) × t)` with adjustable parameters. See how knowledge type, positive/negative feedback, and time interact to produce TRUST / VERIFY / REVALIDATE decisions.
 
 ### Selective Injection via Routing Table
 
