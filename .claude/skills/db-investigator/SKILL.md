@@ -67,9 +67,10 @@ Domain knowledge lives in `references/` as a topic-based structure:
 Before modifying any knowledge file, pass **all five gates in order**:
 
 ```
-Gate 1 — VALUE: Reusable across conversations?
-  One-time result → DO NOT add (this is the MOST COMMON outcome)
-  Recurring pattern / stable fact → proceed
+Gate 1 — VALUE: Is this domain knowledge?
+  Pure operational output (e.g., "query ran successfully", "export done") → REJECT
+  Domain fact, relationship, data characteristic, or pattern → PROCEED
+  (Let Gate 4 decay handle freshness — data_snapshot decays in ~14 days automatically)
 
 Gate 2 — ALIGNMENT: Contradicts existing knowledge?
   1. Extract entity names from new knowledge (table/SP/concept names)
@@ -137,7 +138,7 @@ Gate 5 — PLACEMENT: Which topic file? Which memory tier?
   Update _index.md if new file created OR existing file's scope changed significantly
 ```
 
-**Default outcome is NO CHANGE.** Most interactions do not produce knowledge worth persisting. The gates' primary job is to reject, not to accept.
+**Default outcome is NO CHANGE** for Gates 2-5 (deduplication, redundancy). But Gate 1 should pass most domain facts through — freshness is managed by Gate 4's decay model, not by upfront rejection.
 
 ### Human Entry Points
 
@@ -172,9 +173,9 @@ Human correction: When user indicates existing knowledge is wrong
    - Query confirmed the knowledge → `feedback --result success`
    - Query contradicted the knowledge → `feedback --result failure`
    - No clear signal → skip (do NOT force feedback)
-2. **Capture**: Gate 1 — any finding reusable across future conversations?
-   - One-time query result → **stop here** (most common outcome)
-   - Stable pattern, relationship, or rule → run full Gates 2-5 (Knowledge Governance Protocol)
+2. **Capture**: Gate 1 — is any finding domain knowledge?
+   - Pure operational output (e.g., "query ran", "export done") → **stop here**
+   - Domain fact, relationship, data characteristic, or pattern → run full Gates 2-5 (Knowledge Governance Protocol)
 3. **Default is no action.** But this evaluation must still happen — it takes seconds and is the **only mechanism** through which this skill evolves.
 
 ## Commands
