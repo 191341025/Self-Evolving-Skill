@@ -12,7 +12,6 @@ Usage:
 
 import configparser
 import getpass
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -143,63 +142,42 @@ def run_decay_init():
     return result.returncode
 
 
-def configure_hook():
-    """Register the PostToolUse hook in .claude/settings.json.
+EVOLUTION_RULE = """\
+# db-investigator: Post-Investigation Knowledge Evolution
 
-    Finds the project root (parent of .claude/skills/) and adds the
-    post-investigation hook to .claude/settings.json if not already present.
+After EVERY database investigation (db_query.py, fetch_structure.py, fetch_index.py),
+you MUST execute the Post-Investigation Checkpoint defined in the db-investigator SKILL.md:
+
+1. Evaluate findings: is any result domain knowledge (table relationship, business rule, query pattern, data characteristic)?
+2. If YES → run Gates 2-5, then persist via `decay_engine.py inject`
+3. If NO (pure operational output like "query executed") → skip
+
+This is NON-NEGOTIABLE. The skill's self-evolution depends entirely on this step.
+Do NOT skip it even if the user didn't ask for knowledge capture.
+"""
+
+
+def configure_evolution_rule():
+    """Create a .claude/rules/ file that reminds the AI to follow the checkpoint.
+
+    Rules are loaded into the system prompt at every session start,
+    giving higher priority than SKILL.md body instructions.
     Idempotent: safe to re-run.
     """
-    # Walk up from scripts/ to find .claude/ directory
     skill_dir = SCRIPT_DIR.parent  # db-investigator/
     claude_dir = skill_dir.parent.parent  # .claude/
-    settings_path = claude_dir / "settings.json"
+    rules_dir = claude_dir / "rules"
+    rule_path = rules_dir / "db-investigator-evolution.md"
 
-    hook_command = "python .claude/skills/db-investigator/hooks/post_investigation.py"
-
-    # Load existing settings or start fresh
-    settings = {}
-    if settings_path.exists():
-        try:
-            with open(str(settings_path), "r", encoding="utf-8") as f:
-                settings = json.loads(f.read())
-        except (json.JSONDecodeError, OSError):
-            settings = {}
-
-    # Check if hook already registered
-    hooks = settings.get("hooks", {})
-    post_hooks = hooks.get("PostToolUse", [])
-
-    already_registered = False
-    for entry in post_hooks:
-        entry_hooks = entry.get("hooks", [])
-        for h in entry_hooks:
-            if h.get("command", "") == hook_command:
-                already_registered = True
-                break
-
-    if already_registered:
-        print("\u2713 Hook already registered")
+    if rule_path.exists():
+        print("\u2713 Evolution rule already exists")
         return
 
-    # Add the hook
-    new_hook_entry = {
-        "matcher": "Bash",
-        "hooks": [
-            {
-                "type": "command",
-                "command": hook_command,
-            }
-        ],
-    }
-    post_hooks.append(new_hook_entry)
-    hooks["PostToolUse"] = post_hooks
-    settings["hooks"] = hooks
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    with open(str(rule_path), "w", encoding="utf-8") as f:
+        f.write(EVOLUTION_RULE)
 
-    with open(str(settings_path), "w", encoding="utf-8") as f:
-        f.write(json.dumps(settings, indent=2, ensure_ascii=False))
-
-    print("\u2713 Registered post-investigation hook")
+    print("\u2713 Created evolution rule (.claude/rules/)")
 
 
 def main():
@@ -303,10 +281,10 @@ def main():
     print("Initializing knowledge system...")
     run_decay_init()
 
-    # Register hook for automatic knowledge evolution
+    # Create evolution rule for automatic knowledge capture
     print()
-    print("Registering post-investigation hook...")
-    configure_hook()
+    print("Setting up knowledge evolution...")
+    configure_evolution_rule()
 
     # Success banner
     print()

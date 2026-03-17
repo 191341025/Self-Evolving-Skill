@@ -358,8 +358,8 @@ def run_search(args: argparse.Namespace) -> int:
     entries = scan_directory(search_path)
 
     if not entries:
-        print("No decay tags found.")
-        return 1
+        print("No existing knowledge found. OK to proceed with injection.")
+        return 0
 
     # Filter by entities (OR match, case-insensitive)
     if args.entities:
@@ -399,8 +399,8 @@ def run_search(args: argparse.Namespace) -> int:
         ]
 
     if not entries:
-        print("No matching entries.")
-        return 1
+        print("No matching entries. No conflicts — OK to proceed with injection.")
+        return 0
 
     # Sort by confidence descending
     def sort_key(e: dict) -> float:

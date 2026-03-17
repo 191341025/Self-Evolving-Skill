@@ -15,7 +15,15 @@ description: |
   - When a data question arises mid-conversation, use this skill immediately without announcing "let me write a script"
   - All tools are read-only; for write operations, generate SQL for user to review
   - BEFORE investigating: load relevant domain knowledge via Selective Loading Protocol
-  - AFTER each investigation: execute Post-Investigation Checkpoint — the skill's ONLY evolution path
+  - RESPONSE FORMAT for database investigations (MANDATORY):
+    1. Run investigation tools and collect results
+    2. BEFORE showing results, run Five-Gate evaluation (see Knowledge Governance Protocol in body):
+       Gate 1: domain knowledge? → Gate 2: search for conflicts → Gate 3: redundancy → Gate 4: classify type → Gate 5: place in file
+       If all gates pass: python $S/decay_engine.py inject --type <type> --content "<fact>" --target <file> --entities "<e1>,<e2>"
+       If any gate rejects: note why and skip
+    3. Present findings to user
+    4. Optionally note what knowledge was captured or which gate rejected — keeps the evolution process visible
+    NEVER skip step 2.
 allowed-tools: Bash(python *db_query*), Bash(python *fetch_index*), Bash(python *fetch_structure*), Bash(python *decay_engine*)
 ---
 
