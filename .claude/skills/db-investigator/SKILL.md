@@ -13,6 +13,8 @@ description: |
   - DO NOT ask the user for database info you can look up yourself — query first, report findings
   - When a data question arises mid-conversation, use this skill immediately without announcing "let me write a script"
   - All tools are read-only; for write operations, generate SQL for user to review
+  - BEFORE investigating: load relevant domain knowledge via Selective Loading Protocol
+  - AFTER each investigation: execute Post-Investigation Checkpoint — the skill's ONLY evolution path
 allowed-tools: Bash(python *db_query*), Bash(python *fetch_index*), Bash(python *fetch_structure*), Bash(python *decay_engine*)
 ---
 
@@ -35,6 +37,16 @@ On first use or new environment, run: `python $S/decay_engine.py init`
 - Creates `references/` directory + `_index.md` template + `db_config.ini` template
 - Idempotent: safe to re-run, skips existing files
 - After init: edit `db_config.ini` with database credentials before any queries
+
+## Precondition Check
+
+**AI must verify before ANY investigation:**
+
+1. Check if `$S/db_config.ini` exists
+   - If missing → tell user: "Run `python .claude/skills/db-investigator/scripts/setup.py` to configure database connection"
+   - Do NOT attempt any database queries without valid configuration
+2. Check if `references/_index.md` exists
+   - If missing → run: `python $S/decay_engine.py init`
 
 ## Domain Knowledge System
 
@@ -150,6 +162,19 @@ Human correction: When user indicates existing knowledge is wrong
 - Total topic files exceed 8 → review for consolidation
 - `_index.md` must stay under 40 lines (pure routing, no detail)
 - **Active check**: After each knowledge write, verify the target file's line count; if approaching 80, plan the split before next write
+
+## Post-Investigation Checkpoint
+
+**Execute after EVERY investigation, before moving on. Non-negotiable.**
+
+1. **Feedback**: If `references/` knowledge was loaded and used during this investigation:
+   - Query confirmed the knowledge → `feedback --result success`
+   - Query contradicted the knowledge → `feedback --result failure`
+   - No clear signal → skip (do NOT force feedback)
+2. **Capture**: Gate 1 — any finding reusable across future conversations?
+   - One-time query result → **stop here** (most common outcome)
+   - Stable pattern, relationship, or rule → run full Gates 2-5 (Knowledge Governance Protocol)
+3. **Default is no action.** But this evaluation must still happen — it takes seconds and is the **only mechanism** through which this skill evolves.
 
 ## Commands
 

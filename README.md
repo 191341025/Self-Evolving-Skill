@@ -51,6 +51,32 @@ skill-name/
 
 ---
 
+## Install the Reference Implementation
+
+The reference implementation is a Self-Evolving Skill for **MySQL database investigation**. Install it to see the pattern in action on your own database.
+
+### Step 1 — Install
+
+```bash
+npx skills add 191341025/Self-Evolving-Skill --skill db-investigator
+```
+
+> **Prerequisite:** `pymysql` must be installed — `pip install pymysql`
+
+### Step 2 — Configure
+
+```bash
+python .claude/skills/db-investigator/scripts/setup.py
+```
+
+The interactive wizard collects your MySQL connection details, tests the connection, and initializes the knowledge system.
+
+### Step 3 — Use
+
+Start a Claude Code conversation and ask any database question. The skill activates automatically and begins evolving its domain knowledge through use.
+
+---
+
 ## The Five-Gate Governance Protocol
 
 This is the core of the pattern. It prevents the knowledge base from degrading into noise.

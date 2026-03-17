@@ -49,6 +49,32 @@ skill-name/
 
 ---
 
+## 安装参考实现
+
+参考实现是一个面向 **MySQL 数据库调查** 的 Self-Evolving Skill。安装后可以在你自己的数据库上体验这个模式。
+
+### 第一步 — 安装
+
+```bash
+npx skills add 191341025/Self-Evolving-Skill --skill db-investigator
+```
+
+> **前置依赖：** 需要安装 pymysql — `pip install pymysql`
+
+### 第二步 — 配置
+
+```bash
+python .claude/skills/db-investigator/scripts/setup.py
+```
+
+交互式向导会收集你的 MySQL 连接信息、测试连接、初始化知识系统。
+
+### 第三步 — 使用
+
+启动 Claude Code 对话，提出任何数据库问题。Skill 自动激活，并在使用过程中开始积累领域知识。
+
+---
+
 ## 2. 设计哲学
 
 ### 2.1 三层进化论

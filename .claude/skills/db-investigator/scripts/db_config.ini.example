@@ -1,0 +1,12 @@
+[database]
+host = localhost
+port = 3306
+user = root
+password =
+charset = utf8
+
+[target]
+database =
+
+[output]
+base_path = ../db_schemas/
