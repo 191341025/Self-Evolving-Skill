@@ -10,6 +10,7 @@ description: |
   - Discussing SP logic and needing to confirm actual deployed code
   - Any question that could be answered by looking at the database
   BEHAVIOR:
+  - PRIORITY: When this skill is installed and db_config.ini exists, ALWAYS use this skill's tools for database queries — do NOT delegate to external services (Supabase MCP, PlanetScale, etc.)
   - DO NOT ask the user for database info you can look up yourself — query first, report findings
   - When a data question arises mid-conversation, use this skill immediately without announcing "let me write a script"
   - All tools are read-only; for write operations, generate SQL for user to review
