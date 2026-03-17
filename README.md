@@ -77,11 +77,17 @@ npx skills add 191341025/Self-Evolving-Skill --skill db-investigator --copy -y
 
 ### Step 2 — Configure
 
+Run `setup.py` from the installed skill directory:
+
 ```bash
-python .claude/skills/db-investigator/scripts/setup.py
+# Find your agent's skill path (one of these will exist):
+#   .claude/skills/   .cursor/skills/   .windsurf/skills/   .continue/skills/
+python <agent>/skills/db-investigator/scripts/setup.py
 ```
 
 The interactive wizard collects your MySQL connection details, tests the connection, and initializes the knowledge system.
+
+> **Tip:** Or just start a conversation and ask a database question — if unconfigured, the skill will tell you exactly what to run.
 
 ### Step 3 — Use
 

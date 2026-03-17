@@ -75,11 +75,17 @@ npx skills add 191341025/Self-Evolving-Skill --skill db-investigator --copy -y
 
 ### 第二步 — 配置
 
+在安装好的 skill 目录下运行 `setup.py`：
+
 ```bash
-python .claude/skills/db-investigator/scripts/setup.py
+# 根据你使用的 agent 选择对应路径（以下之一会存在）：
+#   .claude/skills/   .cursor/skills/   .windsurf/skills/   .continue/skills/
+python <agent>/skills/db-investigator/scripts/setup.py
 ```
 
 交互式向导会收集你的 MySQL 连接信息、测试连接、初始化知识系统。
+
+> **提示：** 也可以直接开始对话，问一个数据库问题——如果未配置，skill 会自动告诉你需要运行什么命令。
 
 ### 第三步 — 使用
 
