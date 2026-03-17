@@ -166,11 +166,27 @@ def main():
 
     # Check for existing config
     if CONFIG_PATH.exists():
-        overwrite = input("  db_config.ini already exists. Overwrite? [y/N]: ").strip().lower()
-        if overwrite not in ("y", "yes"):
-            print("  Aborted. Existing config preserved.")
-            return 0
-        print()
+        # Detect placeholder/unconfigured state — skip confirmation
+        try:
+            cfg = configparser.ConfigParser()
+            cfg.read(str(CONFIG_PATH), encoding="utf-8")
+            host_val = cfg.get("database", "host", fallback="")
+            db_val = cfg.get("target", "database", fallback="")
+            is_placeholder = (
+                not host_val
+                or host_val.startswith("<")
+                or not db_val
+                or db_val.startswith("<")
+            )
+        except Exception:
+            is_placeholder = True
+
+        if not is_placeholder:
+            overwrite = input("  db_config.ini already exists. Overwrite? [y/N]: ").strip().lower()
+            if overwrite not in ("y", "yes"):
+                print("  Aborted. Existing config preserved.")
+                return 0
+            print()
 
     # Collect connection info
     try:
