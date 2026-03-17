@@ -55,9 +55,9 @@ skill-name/
 
 ### 环境要求
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)（或其他兼容的 AI 编程代理：Cursor、Windsurf、Codex 等）
-- [Node.js](https://nodejs.org/)（用于 `npx`）
-- Python 3.8+ 并安装 `pymysql` — `pip install pymysql`
+- AI 编程代理（[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、Cursor、Windsurf、Codex 等均可）
+- [Node.js](https://nodejs.org/) ≥ 18 和 Python ≥ 3.8
+- `pip install pymysql`
 
 ### 第一步 — 安装
 

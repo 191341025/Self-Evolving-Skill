@@ -57,9 +57,9 @@ The reference implementation is a Self-Evolving Skill for **MySQL database inves
 
 ### Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (or any compatible agent: Cursor, Windsurf, Codex, etc.)
-- [Node.js](https://nodejs.org/) (for `npx`)
-- Python 3.8+ with `pymysql` — `pip install pymysql`
+- An AI coding agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code), Cursor, Windsurf, Codex, etc.)
+- [Node.js](https://nodejs.org/) ≥ 18 and Python ≥ 3.8
+- `pip install pymysql`
 
 ### Step 1 — Install
 
