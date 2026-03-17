@@ -58,7 +58,7 @@ The reference implementation is a Self-Evolving Skill for **MySQL database inves
 ### Step 1 — Install
 
 ```bash
-npx skills add 191341025/Self-Evolving-Skill --skill db-investigator
+npx skills add 191341025/Self-Evolving-Skill --skill db-investigator --copy
 ```
 
 > **Prerequisite:** `pymysql` must be installed — `pip install pymysql`

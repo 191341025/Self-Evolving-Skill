@@ -56,7 +56,7 @@ skill-name/
 ### 第一步 — 安装
 
 ```bash
-npx skills add 191341025/Self-Evolving-Skill --skill db-investigator
+npx skills add 191341025/Self-Evolving-Skill --skill db-investigator --copy
 ```
 
 > **前置依赖：** 需要安装 pymysql — `pip install pymysql`
