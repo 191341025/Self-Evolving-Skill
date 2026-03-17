@@ -55,13 +55,25 @@ skill-name/
 
 The reference implementation is a Self-Evolving Skill for **MySQL database investigation**. Install it to see the pattern in action on your own database.
 
+### Prerequisites
+
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (or any compatible agent: Cursor, Windsurf, Codex, etc.)
+- [Node.js](https://nodejs.org/) (for `npx`)
+- Python 3.8+ with `pymysql` — `pip install pymysql`
+
 ### Step 1 — Install
 
+**macOS / Linux:**
 ```bash
-npx skills add 191341025/Self-Evolving-Skill --skill db-investigator --copy
+npx skills add 191341025/Self-Evolving-Skill --skill db-investigator
 ```
 
-> **Prerequisite:** `pymysql` must be installed — `pip install pymysql`
+**Windows:**
+```bash
+npx skills add 191341025/Self-Evolving-Skill --skill db-investigator --copy -y
+```
+
+> `--copy` bypasses Windows symlink permission issues; `-y` skips interactive agent selection.
 
 ### Step 2 — Configure
 

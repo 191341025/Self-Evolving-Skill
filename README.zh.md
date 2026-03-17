@@ -53,13 +53,25 @@ skill-name/
 
 参考实现是一个面向 **MySQL 数据库调查** 的 Self-Evolving Skill。安装后可以在你自己的数据库上体验这个模式。
 
+### 环境要求
+
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)（或其他兼容的 AI 编程代理：Cursor、Windsurf、Codex 等）
+- [Node.js](https://nodejs.org/)（用于 `npx`）
+- Python 3.8+ 并安装 `pymysql` — `pip install pymysql`
+
 ### 第一步 — 安装
 
+**macOS / Linux：**
 ```bash
-npx skills add 191341025/Self-Evolving-Skill --skill db-investigator --copy
+npx skills add 191341025/Self-Evolving-Skill --skill db-investigator
 ```
 
-> **前置依赖：** 需要安装 pymysql — `pip install pymysql`
+**Windows：**
+```bash
+npx skills add 191341025/Self-Evolving-Skill --skill db-investigator --copy -y
+```
+
+> `--copy` 绕过 Windows 符号链接权限问题；`-y` 跳过交互式 agent 选择。
 
 ### 第二步 — 配置
 
