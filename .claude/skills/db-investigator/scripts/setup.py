@@ -12,6 +12,7 @@ Usage:
 
 import configparser
 import getpass
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -142,6 +143,65 @@ def run_decay_init():
     return result.returncode
 
 
+def configure_hook():
+    """Register the PostToolUse hook in .claude/settings.json.
+
+    Finds the project root (parent of .claude/skills/) and adds the
+    post-investigation hook to .claude/settings.json if not already present.
+    Idempotent: safe to re-run.
+    """
+    # Walk up from scripts/ to find .claude/ directory
+    skill_dir = SCRIPT_DIR.parent  # db-investigator/
+    claude_dir = skill_dir.parent.parent  # .claude/
+    settings_path = claude_dir / "settings.json"
+
+    hook_command = "python .claude/skills/db-investigator/hooks/post_investigation.py"
+
+    # Load existing settings or start fresh
+    settings = {}
+    if settings_path.exists():
+        try:
+            with open(str(settings_path), "r", encoding="utf-8") as f:
+                settings = json.loads(f.read())
+        except (json.JSONDecodeError, OSError):
+            settings = {}
+
+    # Check if hook already registered
+    hooks = settings.get("hooks", {})
+    post_hooks = hooks.get("PostToolUse", [])
+
+    already_registered = False
+    for entry in post_hooks:
+        entry_hooks = entry.get("hooks", [])
+        for h in entry_hooks:
+            if h.get("command", "") == hook_command:
+                already_registered = True
+                break
+
+    if already_registered:
+        print("\u2713 Hook already registered")
+        return
+
+    # Add the hook
+    new_hook_entry = {
+        "matcher": "Bash",
+        "hooks": [
+            {
+                "type": "command",
+                "command": hook_command,
+            }
+        ],
+    }
+    post_hooks.append(new_hook_entry)
+    hooks["PostToolUse"] = post_hooks
+    settings["hooks"] = hooks
+
+    with open(str(settings_path), "w", encoding="utf-8") as f:
+        f.write(json.dumps(settings, indent=2, ensure_ascii=False))
+
+    print("\u2713 Registered post-investigation hook")
+
+
 def main():
     """Run the interactive setup wizard."""
     # --help support
@@ -242,6 +302,11 @@ def main():
     print()
     print("Initializing knowledge system...")
     run_decay_init()
+
+    # Register hook for automatic knowledge evolution
+    print()
+    print("Registering post-investigation hook...")
+    configure_hook()
 
     # Success banner
     print()
