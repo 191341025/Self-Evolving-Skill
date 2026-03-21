@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /d/IdeaProjects/Self-Evolving-Skill/research/design -type f -name *.md)"
+    ]
+  }
+}

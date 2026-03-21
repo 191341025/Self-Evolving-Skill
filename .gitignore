@@ -1,6 +1,6 @@
 # Claude Code local skill instance (for live testing)
-research/external/
-research/insights/
+# research/external/
+# research/insights/
 test_env/
 
 # Database credentials (sensitive — use db_config.ini.example as template)
