@@ -22,7 +22,7 @@ description: |
        If all gates pass: python $S/decay_engine.py inject --type <type> --content "<fact>" --target <file> --entities "<e1>,<e2>"
        If any gate rejects: note why and skip
     3. Present findings to user
-    4. Optionally note what knowledge was captured or which gate rejected — keeps the evolution process visible
+    4. When knowledge is written: briefly note fact + target file + type. When a gate rejects: briefly note which gate and why. When no knowledge candidate exists: say nothing.
     NEVER skip step 2.
 allowed-tools: Bash(python *db_query*), Bash(python *fetch_index*), Bash(python *fetch_structure*), Bash(python *decay_engine*)
 ---
@@ -64,7 +64,7 @@ On first use or new environment, run: `python $S/decay_engine.py init`
 Domain knowledge lives in `references/` as a topic-based structure:
 
 1. **Always read `references/_index.md` first** — lightweight routing table
-2. Identify task-relevant entities (table names, SP names, business concepts)
+2. Identify task-relevant entities (table names like t_employee, SP names like sp_settle, column names — technical identifiers only, NOT Chinese descriptions)
 3. Run: `python $S/decay_engine.py search --path $S/../references/ --entities "<names>" --level TRUST`
 4. Load only matched files; for VERIFY entries, flag for opportunistic verification
 5. REVALIDATE entries: verify with tools BEFORE using
@@ -81,7 +81,7 @@ Gate 1 — VALUE: Is this domain knowledge?
   (Let Gate 4 decay handle freshness — data_snapshot decays in ~14 days automatically)
 
 Gate 2 — ALIGNMENT: Contradicts existing knowledge?
-  1. Extract entity names from new knowledge (table/SP/concept names)
+  1. Extract entity names from new knowledge — must be technical identifiers (table names like t_employee, SP names, column names) that match <!-- entities: --> tags; NOT Chinese business descriptions
   2. Run: python $S/decay_engine.py search --path $S/../references/ --entities "<names>"
   3. For each match: compare new knowledge with the existing entry
      - Full contradiction → CORRECT existing entry (feedback --result failure on old)
@@ -99,7 +99,7 @@ Gate 3 — REDUNDANCY: Already captured (possibly different wording)?
 Gate 4 — FRESHNESS (write): Assign decay metadata + entities
   → Classify type: schema | business_rule | tool_experience |
                     query_pattern | data_range | data_snapshot
-  → Extract entity names from knowledge content
+  → Extract entity names as technical identifiers (table/SP/column names)
   → Write both tags:
     <!-- decay: type=<type> confirmed=<YYYY-MM-DD> C0=1.0 -->
     <!-- entities: <entity1>, <entity2> -->
@@ -116,7 +116,7 @@ Gate 4 — FRESHNESS (feedback): After operations using knowledge
     → SQL execution success/failure involving known columns/tables
     → Structure query match/mismatch with known schema
     → Numeric comparison within/outside ±5% of recorded value
-    Command: python $S/decay_engine.py feedback --file <f> --line <n> --result success|failure
+    Command: python $S/decay_engine.py feedback --file $S/../references/<f> --line <n> --result success|failure
 
   Soft signals (weight=0.3):
     → Gate 2 ALIGNMENT correction (β+0.3 on corrected entry)
@@ -125,12 +125,12 @@ Gate 4 — FRESHNESS (feedback): After operations using knowledge
       - Value was user-supplied and NOT in known enum → soft SUCCESS (confirms completeness)
       - Value source unclear → do NOT record feedback
     → User explicit confirmation of result correctness
-    Command: python $S/decay_engine.py feedback --file <f> --line <n> --result success|failure --weight 0.3
+    Command: python $S/decay_engine.py feedback --file $S/../references/<f> --line <n> --result success|failure --weight 0.3
 
   No clear outcome → do NOT record feedback
 
   After REVALIDATE passes:
-    python $S/decay_engine.py reset --file <f> --line <n>
+    python $S/decay_engine.py reset --file $S/../references/<f> --line <n>
 
 Decay boundary rules:
   → Never auto-delete entries even if C→0; deletion requires user confirmation
@@ -162,7 +162,7 @@ Human injection: When user explicitly shares domain knowledge
 Human correction: When user indicates existing knowledge is wrong
   (signals: "这个变了", "这条不对", "这个规则已经废弃了")
   → Identify the knowledge entry in references/
-  → Run: python $S/decay_engine.py invalidate --file <f> --line <n>
+  → Run: python $S/decay_engine.py invalidate --file $S/../references/<f> --line <n>
   → Immediately treat as REVALIDATE: verify with tools before further use
 ```
 
@@ -201,14 +201,14 @@ python $S/fetch_index.py [--database <db>]
 python $S/decay_engine.py init
 
 # Knowledge lifecycle
-python $S/decay_engine.py scan --file <topic_file>
+python $S/decay_engine.py scan --file $S/../references/<topic_file>
 python $S/decay_engine.py scan --path $S/../references/
 python $S/decay_engine.py search --path $S/../references/ --entities "<names>" [--level TRUST|VERIFY|REVALIDATE]
 python $S/decay_engine.py search --path $S/../references/ [--min-confidence 0.8]
-python $S/decay_engine.py feedback --file <f> --line <n> --result success|failure [--weight 0.3]
-python $S/decay_engine.py reset --file <f> --line <n>
+python $S/decay_engine.py feedback --file $S/../references/<f> --line <n> --result success|failure [--weight 0.3]
+python $S/decay_engine.py reset --file $S/../references/<f> --line <n>
 python $S/decay_engine.py inject --type <t> --content "<c>" --target <f> [--entities "<e1>,<e2>"]
-python $S/decay_engine.py invalidate --file <f> --line <n>
+python $S/decay_engine.py invalidate --file $S/../references/<f> --line <n>
 ```
 
 ## Constraints

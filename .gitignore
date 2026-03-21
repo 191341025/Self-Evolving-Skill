@@ -1,6 +1,7 @@
 # Claude Code local skill instance (for live testing)
 research/external/
 research/insights/
+test_env/
 
 # Database credentials (sensitive — use db_config.ini.example as template)
 .claude/skills/db-investigator/scripts/db_config.ini
@@ -12,4 +13,4 @@ research/insights/
 # Python
 __pycache__/
 *.pyc
-.pytest_cache/
+.pytest_cache/test_env/
