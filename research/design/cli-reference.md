@@ -3,6 +3,7 @@
 > Self-Evolving Skill 设计文档
 > 状态：已实现（150 个 pytest 用例通过，含 v3 补丁 inject 路径校验 +3、init 子命令 +4）
 > 关联文档：`computation-layer-design.md`（分层架构）、`formula-opportunity-analysis.md`（设计决策来源）
+> **版本**：v1 已实现 — v2 将扩展 CLI（candidate/promote/harvest），见 `knowledge-lifecycle-v2.md`
 
 ---
 

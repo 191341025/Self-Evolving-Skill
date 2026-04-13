@@ -3,6 +3,7 @@
 > Self-Evolving Skill 设计文档
 > 状态：已完成（7 个判定点全部评估，含跨点结构化分析）
 > 前置依赖：decay-model-notes.md（衰减公式）、bayesian-feedback-design.md（反馈机制）
+> **版本**：v1 已实现 — v2 演进设计见 `knowledge-lifecycle-v2.md`
 
 ---
 

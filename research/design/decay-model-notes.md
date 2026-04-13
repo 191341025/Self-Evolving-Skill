@@ -2,6 +2,7 @@
 
 > Self-Evolving Skill 设计笔记
 > 状态：已确认（已实现，99 个 pytest 用例通过，含 C0 参数扩展）
+> **版本**：v1 已实现 — v2 演进设计见 `knowledge-lifecycle-v2.md`（Phase 2 保鲜公式沿用本文档成果）
 
 ---
 

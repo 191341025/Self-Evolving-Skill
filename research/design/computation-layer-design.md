@@ -3,6 +3,7 @@
 > Self-Evolving Skill 设计文档
 > 状态：已确认（已实现，150 个 pytest 用例通过，含 Phase 5 扩展 + v3 补丁 + init 子命令）
 > 前置依赖：`bayesian-feedback-design.md`（反馈机制）、`decay-model-notes.md`（公式推导）
+> **版本**：v1 已实现 — v2 计算层将扩展 Phase 1 distill_score 计算，见 `knowledge-lifecycle-v2.md`
 
 ---
 

@@ -3,6 +3,7 @@
 > Self-Evolving Skill 设计文档
 > 状态：设计定稿 v3 — 所有开放问题已锁定，可进入开发
 > 前置依赖：五道门协议（SKILL.md）、`bayesian-feedback-design.md`
+> **版本**：v1 已实现 — v2 人工入口机制待重新评估，见 `knowledge-lifecycle-v2.md`
 > 更新：2026-03-14 v3 — 锁定写入格式、invalidate 机制、source 字段决策
 
 ---

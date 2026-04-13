@@ -3,6 +3,7 @@
 > Self-Evolving Skill 设计文档
 > 状态：已完成（v2 — 经历三轮认知迭代后定稿并实现）
 > 前置依赖：`bayesian-feedback-design.md`（反馈信号定义）、`computation-layer-design.md`（CLI 架构）
+> **版本**：v1 已实现 — v2 自然反馈原则沿用，触发机制演进见 `knowledge-lifecycle-v2.md`
 > 设计约束：`design-principles.md`（VPRM 规则优先 + 三层表达优先级）
 
 ---

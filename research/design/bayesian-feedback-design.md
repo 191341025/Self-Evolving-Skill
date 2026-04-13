@@ -3,6 +3,7 @@
 > Self-Evolving Skill 设计文档
 > 状态：已确认（已实现，feedback/reset 子命令已落地）
 > 修订：2026-03-14 — 7.1 节 confirmed_at 更新策略变更（feedback success 刷新 t），已同步实现（Phase 5B）
+> **版本**：v1 已实现 — v2 演进设计见 `knowledge-lifecycle-v2.md`（Phase 2 不对称反馈沿用本文档成果）
 > 前置依赖：`research/design/decay-model-notes.md`（公式推导）
 
 ---
