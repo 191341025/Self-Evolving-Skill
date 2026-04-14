@@ -257,25 +257,41 @@ CANDIDATE ──(distill_score ≥ T_promote)──> VALIDATED (C0=1.0, α=0, β
 
 ### 4.2 激活模式
 
-**模式 A：宽触发 Skill（主模式 — 知识检索端）**
+#### 核心模式：高频触发，读写一体
 
-SKILL.md 的 frontmatter trigger 覆盖大部分工作场景。当 Skill 激活时：
-- 检索向量数据库中与当前任务相关的 VALIDATED 知识
-- 按 Knowledge-First 策略使用知识（TRUST 直接用 / VERIFY 标注 / REVALIDATE 先验证）
-- 使用后自然产生反馈信号（Phase 2 的 α/β）
+Skill 通过宽触发条件高频激活，在**每一轮正常工作交互中同时负责"用知识"和"提取知识"**，而非将读和写分成两个独立步骤。
 
-**模式 B：会话收割（补充模式 — 知识写入端）**
+```
+每轮交互
+  │
+  ├── 读：检索向量数据库中与当前任务相关的 VALIDATED 知识
+  │     → Knowledge-First 策略（TRUST 直接用 / VERIFY 标注 / REVALIDATE 先验证）
+  │     → 使用后自然产生反馈信号（Phase 2 的 α/β）
+  │
+  └── 写：观察当前交互是否产生了值得捕获的知识碎片
+        → 有价值 → Gate 1 → Gate 2 → Gate 3 → 写入 CANDIDATE 分区
+        → 无价值 → 什么都不做（大多数交互的正常结果）
+```
 
-通过 `/harvest` 命令（或类似机制）在会话结束前触发知识提取：
-- 回顾本次会话的关键交互
-- 提取候选知识碎片
-- 每条碎片过 Gate 1 → Gate 2 → Gate 3 → 写入 CANDIDATE 分区
+**设计哲学**：知识捕获是自然融入工作流的，不是一个额外步骤。就像一个有经验的人在工作中自然地积累认知，而不是在每天下班前专门"总结今天学到了什么"。这与"自然反馈 > 强制反馈"（`insights/natural-feedback-and-llm-nature.md`）是同一个原则在知识写入端的体现。
 
-**两种模式的分工**：
-- 模式 A 负责**读**：检索知识、使用知识、产生反馈
-- 模式 B 负责**写**：提取知识、准入判定、写入候选
+**用户感知**：无感。Skill 在后台持续工作，用户只会感受到"同样的问题，回答越来越准确"。
 
-这种分工使知识写入不干扰正常工作流，同时保证知识检索随时可用。
+#### 补充模式：/harvest 手动收割
+
+保留 `/harvest` 作为可选的手动触发机制，用于：
+- 会话结束前做一次全面回顾，捕获可能被遗漏的知识碎片
+- 特别密集的工作会话后，主动触发一次深度提取
+- 用户显式要求"把这次讨论的要点记下来"
+
+`/harvest` 不是主要的知识写入路径，而是一个安全网——核心模式已经在每轮交互中持续捕获。
+
+#### 对 context window 的影响
+
+高频触发意味着 Skill 始终加载。控制策略：
+- SKILL.md 保持精简（治理协议 + 工具列表，不放公式细节）
+- 知识按需加载（向量检索只返回相关条目，不全量注入）
+- 知识写入判定轻量化（Gate 1 VALUE 是快速的 LLM 判断，大部分交互会在 Gate 1 被拒绝——"五道门最常见的结果是：什么都不做"）
 
 ---
 
@@ -324,17 +340,31 @@ SKILL.md 的 frontmatter trigger 覆盖大部分工作场景。当 Skill 激活�
         └── source_domain
 ```
 
-### 5.3 技术选型（待评估）
+### 5.3 技术选型（已锁定 2026-04-14）
 
-| 方案 | 特点 | 适用性评估 |
-|------|------|-----------|
-| **ChromaDB** | Python 原生、本地文件存储、API 简洁 | 最轻量，适合单用户本地场景 |
-| **LanceDB** | 基于 Lance 列存格式、零依赖嵌入 | 性能好，但生态较新 |
-| **sqlite-vec** | SQLite 扩展、与现有 SQLite 路线一致 | 如果想保持"单文件可携带"的特性 |
+**向量数据库：LanceDB**
 
-**选型标准**：本地运行、无需服务进程、Python 集成、文件可随项目目录携带。
+| 维度 | LanceDB | 淘汰方案及原因 |
+|------|---------|--------------|
+| 存储效率 | 7 KB / 3 条记录 | ChromaDB 1,828 KB、sqlite-vec 1,584 KB |
+| 依赖 | 8 个 | ChromaDB 27 个（含 fastapi/grpcio 等重量级依赖） |
+| API 风格 | Pandas + SQL-like WHERE | sqlite-vec 需手动 struct.pack + JOIN |
+| Metadata 过滤 | `status = 'CANDIDATE' AND confidence > 0.5` | 语法直观，天然适合两阶段分区查询 |
+| Windows 兼容 | 实测通过 | Milvus Lite 不支持 Windows |
 
-**选型决策留到原型阶段**，先完成设计对齐。
+安装：`pip install lancedb`
+
+**中文 Embedding 模型：BAAI/bge-small-zh-v1.5**
+
+| 维度 | bge-small-zh-v1.5 | 说明 |
+|------|-------------------|------|
+| 模型大小 | ~90 MB | 对比 bge-base-zh ~400 MB、bge-large-zh ~1.2 GB |
+| 向量维度 | 512 | 1000 条知识仅 ~2 MB 向量数据 |
+| 中文质量 | C-MTEB 小模型最优 | BAAI（智源研究院）出品 |
+| 推理速度 | CPU 亚秒级 | 不拖慢 Skill 响应 |
+| 升级路径 | → bge-base-zh（768 维）→ bge-large-zh（1024 维） | API 一致，只换模型名 |
+
+安装：`pip install sentence-transformers`（首次使用自动下载模型）
 
 ---
 

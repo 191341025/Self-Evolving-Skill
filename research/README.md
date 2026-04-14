@@ -11,6 +11,7 @@
 | 文件 | 状态 | 说明 |
 |------|------|------|
 | `knowledge-lifecycle-v2.md` | **设计草案** | 两阶段知识生命周期模型：Phase 1 准入（distill_score）+ Phase 2 保鲜（C(t) 衰减）；向量数据库存储；激活机制 |
+| `implementation-plan-v2.md` | **计划草案** | 分 4 阶段实现路线：Phase 0 技术选型 → Phase 1 最小可用 → Phase 2 两阶段生命周期 → Phase 3 打磨调参 |
 
 ### 通用设计（v1/v2 共用）
 

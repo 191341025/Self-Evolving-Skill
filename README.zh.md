@@ -463,7 +463,34 @@ Skill 的进化不需要 KPI 式的精确度量，但需要一种定性的成熟
    - 成熟后趋于稳定，只在业务变化时更新
 ```
 
-## 15. 论文参考
+## 15. 路线图：v2 — 知识生命周期治理
+
+> [!NOTE]
+> v2 目前处于设计阶段。上述 v1 参考实现（db-investigator）仍然完全可用。
+
+本模式正在从数据库专用技能演进为**通用知识生命周期治理机制**。核心变更：
+
+**两阶段知识生命周期**
+- **阶段一 — 知识准入（蒸馏）**：知识需要通过多次使用证明其价值才能被接受。累积公式 `distill_score = Σ (Wc × Wr × e^(-λd × days))` 追踪经可信度加权、近期衰减的确认记录。只有分数超过阈值，知识才能晋升为 VALIDATED 状态。
+- **阶段二 — 知识保鲜（保持）**：沿用现有衰减模型 `C(t) = C₀ × e^(-λ × (β+1)/(α+1) × t)`，不对称反馈——成功谨慎加分（+0.3），失败激进扣分（+1.5）。需要 5 次正确使用才能抵消 1 次失败。
+
+**向量数据库存储**
+- 从 Markdown 文件 + 路由表迁移到 LanceDB（向量数据库）+ BAAI/bge-small-zh-v1.5（中文 embedding 模型）
+- 支持语义检索、基于向量的去重、CANDIDATE/VALIDATED 分区
+
+**领域无关的治理层**
+- 治理层（五道门、衰减模型、向量存储）与具体领域解耦
+- db-investigator 成为第一个领域插件，其他领域可复用相同的治理基础设施
+
+**始终在线的激活模式**
+- Skill 在每次交互中触发——同时检索相关知识和观察是否产生新知识
+- 知识捕获是自然、持续的，不是额外步骤
+
+设计文档：[`research/design/knowledge-lifecycle-v2.md`](research/design/knowledge-lifecycle-v2.md) | [`research/design/implementation-plan-v2.md`](research/design/implementation-plan-v2.md)
+
+---
+
+## 16. 论文参考
 
 - Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4. ([arXiv](https://arxiv.org/abs/2507.21046))
 - 本模式主要关联论文 Section 3.2 (Context Evolution: Memory + Prompt) 和 Section 4.2 (Inter-test-time Evolution)。

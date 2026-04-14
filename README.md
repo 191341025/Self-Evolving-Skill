@@ -430,6 +430,33 @@ Each experiment includes full evolution logs, Five-Gate decision records, qualit
 
 ---
 
+## Roadmap: v2 — Knowledge Lifecycle Governance
+
+> [!NOTE]
+> v2 is in the design phase. The v1 reference implementation (db-investigator) above remains fully functional.
+
+The pattern is evolving from a database-specific skill to a **general-purpose knowledge lifecycle governance mechanism**. Core changes:
+
+**Two-Phase Knowledge Lifecycle**
+- **Phase 1 — Knowledge Admission (Distillation):** Knowledge must prove its value through repeated use before being accepted. A cumulative `distill_score = Σ (Wc × Wr × e^(-λd × days))` tracks credibility-weighted, recency-decayed confirmations. Only when the score crosses a threshold does knowledge graduate to VALIDATED status.
+- **Phase 2 — Knowledge Freshness (Preservation):** The existing decay model `C(t) = C₀ × e^(-λ × (β+1)/(α+1) × t)` with asymmetric feedback — success adds cautious credit (+0.3), failure adds aggressive penalty (+1.5). Five correct uses are needed to offset one failure.
+
+**Vector Database Storage**
+- Moving from Markdown files + routing table to LanceDB (vector database) + BAAI/bge-small-zh-v1.5 (Chinese embedding model)
+- Enables semantic search, vector-based deduplication, and CANDIDATE/VALIDATED partitioning
+
+**Domain-Agnostic Governance**
+- The governance layer (Five Gates, decay model, vector storage) is decoupled from any specific domain
+- db-investigator becomes the first domain plugin; other domains can reuse the same governance infrastructure
+
+**Always-On Activation**
+- The skill triggers on every interaction — simultaneously retrieving relevant knowledge and observing whether new knowledge emerges
+- Knowledge capture is natural and continuous, not a separate step
+
+Design documents: [`research/design/knowledge-lifecycle-v2.md`](research/design/knowledge-lifecycle-v2.md) | [`research/design/implementation-plan-v2.md`](research/design/implementation-plan-v2.md)
+
+---
+
 ## References
 
 - Gao, H., Geng, J., et al. (2026). "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve on the Path to Artificial Super Intelligence." *Transactions on Machine Learning Research*. arXiv:2507.21046v4. ([arXiv](https://arxiv.org/abs/2507.21046))
